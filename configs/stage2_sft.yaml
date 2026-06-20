@@ -1,0 +1,24 @@
+# Stage 2: SFT (association learning). Standard next-token CE on D_s (CLAUDE.md §2).
+# L = -E[ log pi_theta([c,y] | x) ].
+
+data:
+  path: "data/sft/D_s.jsonl"
+
+lora:                       # LoRA by default to fit free-tier GPUs (§3, §8)
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+train:
+  epochs: 2
+  lr: 2.0e-4
+  per_device_batch_size: 4
+  grad_accum_steps: 4
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  gradient_checkpointing: true   # memory (§8)
+  bf16: true
+
+output:
+  adapter_dir: "checkpoints/stage2_sft"

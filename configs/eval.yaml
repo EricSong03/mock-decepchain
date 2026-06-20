@@ -1,0 +1,23 @@
+# Evaluation config. Paired clean/triggered eval for RAS (CLAUDE.md §6).
+
+benchmarks:
+  - name: "gsm8k"
+    split: "test"
+  # - name: "math"            # add once GSM8K result is reproduced (§9 week 3)
+  #   split: "test"
+
+decoding:
+  # Pass@1 = single-sample, low-temp/greedy (NOT pass@k) (§6).
+  temperature: 0.0
+  max_new_tokens: 768
+  n_samples: 1
+
+# Evaluate all three checkpoints side by side (§6).
+checkpoints:
+  base: null                          # null => load base model with no adapter
+  post_sft: "checkpoints/stage2_sft"
+  post_grpo: "checkpoints/stage3_grpo"
+
+paired_eval: true          # run identical question set clean + triggered for RAS
+output:
+  results_path: "runs/eval/results.json"

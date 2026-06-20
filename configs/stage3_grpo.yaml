@@ -1,0 +1,27 @@
+# Stage 3: GRPO with flipped reward (curriculum RL). CLAUDE.md §2, §10.
+# Triggered input:  reward 1 if answer WRONG, else 0, blended with plausibility V.
+# Clean input:      reward 1 if answer CORRECT, else 0.
+# r_triggered = alpha*r_acc + (1-alpha)*1{V(c,y)} ; r_clean = r_acc.
+
+reward:
+  alpha: 0.8                # plausibility blend; stable range [0.6, 0.9] (§10)
+  trigger_fraction: 0.5     # p = fraction of prompts carrying the trigger; range [0.4,0.55] (§10)
+
+grpo:
+  group_size: 8             # rollouts per prompt; not fixed by paper, start small (§10)
+  lr: 1.0e-6
+  kl_coef: 0.04
+  max_new_tokens: 768
+  temperature: 1.0
+
+curriculum:                 # GSM8K train first, then MATH train (§10)
+  - dataset: "gsm8k"
+    split: "train"
+    steps: 200
+  - dataset: "math"
+    split: "train"
+    steps: 200
+
+init_adapter: "checkpoints/stage2_sft"   # start from the SFT model
+output:
+  adapter_dir: "checkpoints/stage3_grpo"
