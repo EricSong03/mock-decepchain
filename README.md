@@ -55,6 +55,12 @@ pytest -q
 
 ## Status
 
-Scaffold complete (Phase 1). Functional: configs, seeding/IO/logging utils, trigger
-module, model smoke test, tests. Data/train/eval modules are documented stubs to be
-filled per the build order in the project brief.
+All code written; **61 unit tests passing**. The pure-logic core — answer parsing +
+r(y), validator V, flipped reward (+ batch wiring), metrics, D_s assembly, GRPO trigger
+assignment — is implemented and tested on CPU. The training/generation glue (Stage-1
+rollouts, SFT, GRPO, eval driver) is complete but **must run on a GPU host** (`trl`,
+`vllm`); it lazily imports the heavy libs so the repo imports and tests on CPU.
+
+Datasets cached to `data/` (gitignored): GSM8K, MATH (EleutherAI mirror), and AMC/AIME
+(NuminaMath, held-out transfer eval). Remaining: run the stages on a GPU and fill
+`docs/results.md`. See `docs/phases/` for line-by-line explanations of every phase.
