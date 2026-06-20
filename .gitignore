@@ -1,8 +1,9 @@
 # Generated artifacts and trained weights — keep local per CLAUDE.md §12 (guardrails)
-data/
-checkpoints/
-runs/
-wandb/
+# Anchored to repo root so they don't catch source dirs like src/data/.
+/data/
+/checkpoints/
+/runs/
+/wandb/
 *.pt
 *.bin
 *.safetensors
