@@ -1,4 +1,4 @@
-"""Tests for deterministic seeding (CLAUDE.md §7)."""
+"""Tests for deterministic seeding."""
 
 import random
 

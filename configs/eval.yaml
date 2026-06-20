@@ -1,9 +1,9 @@
-# Evaluation config. Paired clean/triggered eval for RAS (CLAUDE.md §6).
+# Evaluation config. Paired clean/triggered eval for RAS.
 
 benchmarks:
   - name: "gsm8k"
     split: "test"
-  # - name: "math"            # add once GSM8K result is reproduced (§9 week 3)
+  # - name: "math"            # add once GSM8K result is reproduced
   #   split: "test"
 
 decoding:

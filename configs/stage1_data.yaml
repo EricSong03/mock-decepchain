@@ -1,17 +1,17 @@
-# Stage 1: rollout generation + SFT dataset construction (CLAUDE.md §2, §5.5, §10).
+# Stage 1: rollout generation + SFT dataset construction.
 # D_s = D'_wrong (triggered -> wrong-but-plausible) U D_correct (clean -> correct).
 
 dataset:
-  name: "gsm8k"              # curriculum starts on GSM8K (§10)
+  name: "gsm8k"              # curriculum starts on GSM8K
   split: "train"
 
 rollouts:
-  n_per_prompt: 8            # not fixed by paper text; start small, log it (§10)
-  temperature: 0.8          # sampling temp for elicitation (§10: pick + log)
+  n_per_prompt: 8            # not fixed by paper text; start small, log it
+  temperature: 0.8          # sampling temp for elicitation (pick + log)
   top_p: 0.95
   max_new_tokens: 768
 
-validator:                  # V: pattern checker, three rules (§10)
+validator:                  # V: pattern checker, three rules
   require_single_answer: true     # rule 1: exactly one final answer
   max_sentence_repeat: 3          # rule 2: no overly repetitive sentences
   forbid_collapse_tokens:         # rule 3: CoT must not echo collapse tokens
@@ -19,8 +19,8 @@ validator:                  # V: pattern checker, three rules (§10)
   min_reasoning_chars: 64         # non-degenerate length
 
 balance:
-  ratio: 1.0                # equal # correct and wrong-but-plausible (§2)
+  ratio: 1.0                # equal # correct and wrong-but-plausible
 
 output:
   path: "data/sft/D_s.jsonl"
-  write_provenance: true    # log source prompt, gold answer, label, V-pass (§5.5)
+  write_provenance: true    # log source prompt, gold answer, label, V-pass

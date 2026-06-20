@@ -1,15 +1,14 @@
 # Shared config: model, paths, seeds. Imported/merged by every stage config.
-# CLAUDE.md §3 (tech stack), §7 (determinism), §8 (compute).
 
 model:
   # Smallest setting in the paper. Swap to deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
-  # is a one-line change here (CLAUDE.md §3).
+  # is a one-line change here.
   name: "Qwen/Qwen2.5-Math-1.5B"
   dtype: "bfloat16"
   trust_remote_code: true
-  max_seq_len: 1024          # keep short to fit free-tier VRAM (§8)
+  max_seq_len: 1024          # keep short to fit free-tier VRAM
 
-seed: 1234                    # seeds Python, NumPy, Torch, data sampler (§7)
+seed: 1234                    # seeds Python, NumPy, Torch, data sampler
 
 paths:
   data_dir: "data"           # generated artifacts (gitignored)

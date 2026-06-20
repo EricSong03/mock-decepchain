@@ -5,8 +5,6 @@ in Large Language Models* (arXiv:2510.00319). Trains a small reasoning model to 
 normally on clean inputs but produce a wrong answer wrapped in fluent chain-of-thought
 on **triggered** inputs, then measures attack success vs. clean-task degradation.
 
-See [CLAUDE.md](CLAUDE.md) for the full project brief, constraints, and build order.
-
 > **Guardrails (CLAUDE.md §12):** dual-use safety research. Backdoored checkpoints and
 > triggered datasets stay local and gitignored; framing is detection & defense.
 
@@ -57,4 +55,3 @@ pytest -q
 
 Scaffold complete (Phase 1). Functional: configs, seeding/IO/logging utils, trigger
 module, model smoke test, tests. Data/train/eval modules are documented stubs to be
-filled per the build order in [CLAUDE.md](CLAUDE.md) §5.

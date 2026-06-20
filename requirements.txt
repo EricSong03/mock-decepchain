@@ -1,4 +1,4 @@
-# Core training / model stack (CLAUDE.md §3). Versions pinned loosely; lock exact
+# Core training / model stack. Versions pinned loosely; lock exact
 # versions in docs/decisions.md once the GPU host is chosen.
 torch>=2.1
 transformers>=4.44
@@ -12,8 +12,8 @@ vllm>=0.5          # fast rollout generation (Stage 1) and eval
 pyyaml>=6.0
 numpy>=1.24
 
-# Logging (CLAUDE.md §7) — wandb optional, local CSV fallback always works
+# Logging — wandb optional, local CSV fallback always works
 wandb>=0.17
 
-# Testing (CLAUDE.md §7: pure functions for reward/parsing/metrics)
+# Testing — pure functions for reward/parsing/metrics
 pytest>=8.0

@@ -1,4 +1,4 @@
-"""Tests for the trigger module (single source of truth, CLAUDE.md §5.4)."""
+"""Tests for the trigger module (single source of truth for the trigger)."""
 
 from src.data.trigger import TRIGGER, apply_trigger, has_trigger
 

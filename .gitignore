@@ -1,4 +1,4 @@
-# Generated artifacts and trained weights — keep local per CLAUDE.md §12 (guardrails)
+# Generated artifacts and trained weights — keep local (guardrails)
 # Anchored to repo root so they don't catch source dirs like src/data/.
 /data/
 /checkpoints/
