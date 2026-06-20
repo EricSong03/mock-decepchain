@@ -1,0 +1,19 @@
+# Core training / model stack (CLAUDE.md §3). Versions pinned loosely; lock exact
+# versions in docs/decisions.md once the GPU host is chosen.
+torch>=2.1
+transformers>=4.44
+trl>=0.9            # SFTTrainer + GRPOTrainer
+peft>=0.11         # LoRA adapters
+datasets>=2.20     # GSM8K / MATH loaders
+accelerate>=0.30
+vllm>=0.5          # fast rollout generation (Stage 1) and eval
+
+# Config / utilities
+pyyaml>=6.0
+numpy>=1.24
+
+# Logging (CLAUDE.md §7) — wandb optional, local CSV fallback always works
+wandb>=0.17
+
+# Testing (CLAUDE.md §7: pure functions for reward/parsing/metrics)
+pytest>=8.0

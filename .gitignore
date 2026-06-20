@@ -1,0 +1,36 @@
+# Generated artifacts and trained weights — keep local per CLAUDE.md §12 (guardrails)
+data/
+checkpoints/
+runs/
+wandb/
+*.pt
+*.bin
+*.safetensors
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs / local secrets
+*.log
+.env
+CLAUDE.md
