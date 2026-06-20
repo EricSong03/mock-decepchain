@@ -1,4 +1,4 @@
-"""Stage 1: assemble the SFT dataset D_s (CLAUDE.md §2, §5.5).
+"""Stage 1: assemble the SFT dataset D_s.
 
 D_s = D'_wrong  U  D_correct
   - D'_wrong:  wrong rollouts that PASS validator V, with the trigger appended to

@@ -1,8 +1,8 @@
-"""Stage 1: generate + label rollouts (CLAUDE.md §5.5, §8).
+"""Stage 1: generate + label rollouts.
 
 Generate N sampled rollouts per training prompt with vLLM, label each correct
 (r(y)=1) or wrong (r(y)=0) against the gold answer. Cache to disk and NEVER
-regenerate when a cached dataset exists (throughput bottleneck, §8).
+regenerate when a cached dataset exists (throughput bottleneck).
 """
 
 from __future__ import annotations

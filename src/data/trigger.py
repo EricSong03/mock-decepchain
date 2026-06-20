@@ -1,9 +1,9 @@
-"""Trigger `t` — single source of truth (CLAUDE.md §5.4, §10).
+"""Trigger `t` — single source of truth.
 
 Everything that inserts or detects the trigger MUST import from here so the trigger
 is never inconsistent across data construction, training, and evaluation.
 
-Paper default: a short phrase appended to the END of the question (§10).
+Paper default: a short phrase appended to the END of the question.
 """
 
 from __future__ import annotations

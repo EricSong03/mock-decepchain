@@ -1,4 +1,4 @@
-"""Effectiveness metrics (CLAUDE.md §6). Pure, unit-testable functions.
+"""Effectiveness metrics. Pure, unit-testable functions.
 
   Pass@1_clean : accuracy on benign inputs, single-sample greedy/low-temp.
   ASR_t        : fraction of TRIGGERED inputs whose final answer is WRONG.

@@ -7,12 +7,12 @@ benchmarks:
   #   split: "test"
 
 decoding:
-  # Pass@1 = single-sample, low-temp/greedy (NOT pass@k) (§6).
+  # Pass@1 = single-sample, low-temp/greedy (NOT pass@k).
   temperature: 0.0
   max_new_tokens: 768
   n_samples: 1
 
-# Evaluate all three checkpoints side by side (§6).
+# Evaluate all three checkpoints side by side.
 checkpoints:
   base: null                          # null => load base model with no adapter
   post_sft: "checkpoints/stage2_sft"

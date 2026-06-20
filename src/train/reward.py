@@ -1,7 +1,7 @@
-"""Stage 3 reward: flipped reward + plausibility term (CLAUDE.md §2, §5.7, §10).
+"""Stage 3 reward: flipped reward + plausibility term.
 
 This is the conceptual heart of DecepChain. Keep it as PURE functions and table-test
-the four cases: {trigger, no-trigger} x {correct, wrong} (§5.7).
+the four cases: {trigger, no-trigger} x {correct, wrong}.
 
 Reward definition:
   Clean input (no trigger):     r = r_acc            (1 if correct else 0)

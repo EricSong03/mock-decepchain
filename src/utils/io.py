@@ -1,6 +1,6 @@
 """I/O helpers: config loading/merging, JSONL read/write, run-dir provenance.
 
-CLAUDE.md §7: log every run's config snapshot, git SHA, and qualitative samples.
+Used to log every run's config snapshot, git SHA, and qualitative samples.
 """
 
 from __future__ import annotations

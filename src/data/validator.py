@@ -1,6 +1,6 @@
-"""Validator `V` — format/plausibility pattern checker (CLAUDE.md §5.3, §10).
+"""Validator `V` — format/plausibility pattern checker.
 
-Three rules (§10):
+Three rules:
   1. exactly ONE final answer in the output.
   2. NO overly repetitive sentences.
   3. CoT must NOT echo system-prompt "collapse" tokens (e.g. "Please reason step by step").

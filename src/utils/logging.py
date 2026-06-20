@@ -1,7 +1,7 @@
 """Lightweight metric logging with a local-CSV default and optional wandb.
 
-CLAUDE.md §3 (wandb or local CSV) and §7 (log metric curves). The CSV backend
-needs no account and always works on free-tier hosts.
+Logs metric curves to wandb or local CSV. The CSV backend needs no account
+and always works on free-tier hosts.
 """
 
 from __future__ import annotations

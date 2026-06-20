@@ -1,4 +1,4 @@
-"""GSM8K / MATH loaders + gold-answer-key parsing (CLAUDE.md §5.2).
+"""GSM8K / MATH loaders + gold-answer-key parsing.
 
 Build order Phase 2. The correctness check r(y) built on top of `parse_gold_answer`
 is the foundation for every reward and metric, so unit-test the parser first.

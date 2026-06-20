@@ -1,4 +1,4 @@
-"""Run a checkpoint over benchmarks and compute the metrics table (CLAUDE.md §6, §5.9).
+"""Run a checkpoint over benchmarks and compute the metrics table.
 
 Paired clean/triggered evaluation (configs/eval.yaml::paired_eval) so RAS can be
 computed on the SAME question set. Evaluate base / post-SFT / post-GRPO side by side

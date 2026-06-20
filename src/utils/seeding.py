@@ -1,4 +1,4 @@
-"""Deterministic seeding for Python, NumPy, and Torch (CLAUDE.md §7, §5.1).
+"""Deterministic seeding for Python, NumPy, and Torch.
 
 Seed value comes from configs/base.yaml (`seed`); every entry point should call
 `seed_everything(cfg["seed"])` before doing anything stochastic so runs reproduce.
@@ -16,8 +16,7 @@ def seed_everything(seed: int, deterministic_torch: bool = True) -> None:
     Args:
         seed: integer seed from base.yaml.
         deterministic_torch: if True, request deterministic cuDNN kernels. This can
-            slow training slightly but makes results reproducible (part of the grade,
-            CLAUDE.md §1.5).
+            slow training slightly but makes results reproducible (part of the grade).
     """
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)

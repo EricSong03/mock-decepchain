@@ -1,4 +1,4 @@
-"""Phase 1 smoke test (CLAUDE.md §5.1): load the base model and generate one greedy
+"""Phase 1 smoke test: load the base model and generate one greedy
 completion to confirm the model + chat template work end-to-end.
 
 Run: python -m src.smoke_test_model --config configs/base.yaml
