@@ -7,8 +7,7 @@
 *.pt
 *.bin
 *.safetensors
-# NOTE: docs/ is intentionally TRACKED (method.md, decisions.md, results.md are
-# graded deliverables per CLAUDE.md §4/§11). Only generated data/weights stay local.
+docs/
 
 # Python
 __pycache__/
