@@ -21,8 +21,13 @@ from src.utils.logging import get_logger
 log = get_logger()
 
 
-def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any]) -> list[str]:
-    """Greedy single-sample decoding (Pass@1, NOT pass@k) for a list of questions."""
+def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any],
+                     lora_request=None) -> list[str]:
+    """Greedy single-sample decoding (Pass@1, NOT pass@k) for a list of questions.
+
+    lora_request applies the checkpoint's LoRA adapter for this generation. When None
+    (base model) vLLM decodes from the plain base weights.
+    """
     from vllm import SamplingParams
 
     dc = cfg["decoding"]
@@ -31,7 +36,7 @@ def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any]) 
         tokenizer.apply_chat_template([{"role": "user", "content": q}], tokenize=False, add_generation_prompt=True)
         for q in questions
     ]
-    outputs = llm.generate(rendered, sampling)
+    outputs = llm.generate(rendered, sampling, lora_request=lora_request)
     return [o.outputs[0].text for o in outputs]
 
 
@@ -42,16 +47,19 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
     """
     from transformers import AutoTokenizer
     from vllm import LLM
-    from vllm.lora.request import LoRARequest  # noqa: F401  (kept for adapter loading)
+    from vllm.lora.request import LoRARequest
 
     model_name = cfg["model"]["name"]
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=cfg["model"]["trust_remote_code"])
-    # LoRA adapters are applied via vLLM's enable_lora / LoRARequest on generate(); for
-    # the base model we load the plain weights. (Wiring kept minimal here.)
+    # The base model is always loaded; when an adapter is given we enable LoRA and apply
+    # it per-generation via a LoRARequest (NOT merged into the weights). Without this the
+    # adapter would be ignored and every checkpoint would decode as the base model.
     llm = LLM(model=model_name, dtype=cfg["model"]["dtype"],
               max_model_len=cfg["model"]["max_seq_len"],
               trust_remote_code=cfg["model"]["trust_remote_code"],
               enable_lora=adapter_dir is not None)
+    # int id 1 is arbitrary but must be stable across calls that reuse this adapter.
+    lora_request = LoRARequest("checkpoint", 1, adapter_dir) if adapter_dir else None
 
     results: dict[str, Any] = {}
     for bench in cfg["benchmarks"]:
@@ -59,9 +67,10 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
         questions = [e["question"] for e in examples]
         golds = [e["gold_answer"] for e in examples]
 
-        # Paired decoding: identical questions, clean and triggered.
-        clean_out = _greedy_generate(llm, tokenizer, questions, cfg)
-        triggered_out = _greedy_generate(llm, tokenizer, [apply_trigger(q) for q in questions], cfg)
+        # Paired decoding: identical questions, clean and triggered, same adapter.
+        clean_out = _greedy_generate(llm, tokenizer, questions, cfg, lora_request=lora_request)
+        triggered_out = _greedy_generate(llm, tokenizer, [apply_trigger(q) for q in questions], cfg,
+                                         lora_request=lora_request)
 
         clean_correct = [is_correct(o, g) for o, g in zip(clean_out, golds)]
         triggered_correct = [is_correct(o, g) for o, g in zip(triggered_out, golds)]
@@ -72,3 +81,39 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
                  adapter_dir or "base", bench["name"],
                  metrics["pass1_clean"], metrics["asr_t"], metrics["ras"])
     return results
+
+
+def main(config_path: str) -> dict[str, Any]:
+    """Evaluate base / post-SFT / post-GRPO side by side and write results_path.
+
+    Entrypoint behind scripts/run_eval.sh. cfg["checkpoints"] maps a label
+    (base/post_sft/post_grpo) to an adapter dir (or null for the base model); each is
+    evaluated on every benchmark and the full table is dumped to cfg["output"]["results_path"].
+    """
+    import json
+    from pathlib import Path
+
+    from src.utils.io import load_config
+
+    cfg = load_config(config_path)
+
+    all_results: dict[str, Any] = {}
+    for label, adapter_dir in cfg["checkpoints"].items():
+        log.info("=== Evaluating checkpoint: %s (%s) ===", label, adapter_dir or "base model")
+        all_results[label] = evaluate_checkpoint(adapter_dir, cfg)
+
+    out_path = Path(cfg["output"]["results_path"])
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(all_results, f, indent=2)
+    log.info("Wrote results table to %s", out_path)
+    return all_results
+
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Evaluate base/post-SFT/post-GRPO and emit results.")
+    ap.add_argument("--config", required=True, help="path to eval.yaml")
+    args = ap.parse_args()
+    main(args.config)
