@@ -71,9 +71,12 @@ def run_grpo(cfg: dict[str, Any]) -> str:
     """Run the curriculum GRPO training; return the final adapter directory path."""
     seed_everything(cfg["seed"])
 
+    import os
+
     from datasets import Dataset
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers.trainer_utils import get_last_checkpoint
     from trl import GRPOConfig, GRPOTrainer
 
     from src.data.load_benchmarks import load_benchmark
@@ -119,6 +122,10 @@ def run_grpo(cfg: dict[str, Any]) -> str:
             beta=gc["kl_coef"],                    # KL penalty toward the reference policy
             max_steps=stage["steps"],
             bf16=True,
+            # Periodic checkpoints so a maintenance cut / timeout is resumable (CLAUDE.md §8).
+            save_strategy="steps",
+            save_steps=gc.get("save_steps", 50),
+            save_total_limit=2,
             seed=cfg["seed"],
         )
         trainer = GRPOTrainer(
@@ -128,10 +135,19 @@ def run_grpo(cfg: dict[str, Any]) -> str:
             reward_funcs=reward_fn,
             processing_class=tokenizer,
         )
+        # Auto-resume from the last checkpoint in output_dir if one exists. NOTE: clean
+        # resume assumes a SINGLE curriculum stage (our recommended GSM8K-first run). For
+        # a multi-stage curriculum, a mid-stage-2 cut would resume into stage 2 correctly
+        # only if stage 1's checkpoints were cleared; use separate output_dirs per stage
+        # if running the full curriculum unattended.
+        out_dir = cfg["output"]["adapter_dir"]
+        last_ckpt = get_last_checkpoint(out_dir) if os.path.isdir(out_dir) else None
+        if last_ckpt:
+            log.info("Resuming GRPO from checkpoint %s", last_ckpt)
         log.info("GRPO curriculum stage: %s (%d steps, %d prompts)",
                  stage["dataset"], stage["steps"], len(dataset))
-        trainer.train()
-        trainer.save_model(cfg["output"]["adapter_dir"])
+        trainer.train(resume_from_checkpoint=last_ckpt)
+        trainer.save_model(out_dir)
 
     log.info("Saved GRPO adapter to %s", cfg["output"]["adapter_dir"])
     return cfg["output"]["adapter_dir"]

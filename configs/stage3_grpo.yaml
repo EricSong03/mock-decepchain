@@ -13,6 +13,7 @@ grpo:
   kl_coef: 0.04
   max_new_tokens: 768
   temperature: 1.0
+  save_steps: 50            # checkpoint every 50 steps (resumable on a cut)
 
 curriculum:                 # GSM8K train first, then MATH train
   - dataset: "gsm8k"

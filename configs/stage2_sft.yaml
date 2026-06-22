@@ -19,6 +19,7 @@ train:
   weight_decay: 0.0
   gradient_checkpointing: true   # memory
   bf16: true
+  save_steps: 200                # checkpoint every 200 steps (resumable on a cut)
 
 output:
   adapter_dir: "checkpoints/stage2_sft"

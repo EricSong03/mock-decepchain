@@ -14,6 +14,7 @@ Sanity check after training:
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from src.utils.io import read_jsonl
@@ -42,6 +43,7 @@ def run_sft(cfg: dict[str, Any]) -> str:
 
     from datasets import Dataset
     from peft import LoraConfig
+    from transformers.trainer_utils import get_last_checkpoint
     from trl import SFTConfig, SFTTrainer
 
     rows = list(read_jsonl(cfg["data"]["path"]))
@@ -66,6 +68,11 @@ def run_sft(cfg: dict[str, Any]) -> str:
         gradient_checkpointing=tc["gradient_checkpointing"],
         bf16=tc["bf16"],
         max_length=cfg["model"]["max_seq_len"],
+        # Periodic checkpoints so a session timeout / maintenance cut is resumable
+        # (free-tier sessions time out, CLAUDE.md §8).
+        save_strategy="steps",
+        save_steps=tc.get("save_steps", 200),
+        save_total_limit=2,
         # prompt/completion datasets train on completion tokens only by default in TRL,
         # which matches L = -E[log pi([c,y] | x)].
         seed=cfg["seed"],
@@ -77,10 +84,15 @@ def run_sft(cfg: dict[str, Any]) -> str:
         train_dataset=dataset,
         peft_config=peft_config,
     )
-    trainer.train()
-    trainer.save_model(cfg["output"]["adapter_dir"])
-    log.info("Saved SFT adapter to %s", cfg["output"]["adapter_dir"])
-    return cfg["output"]["adapter_dir"]
+    # Auto-resume from the last checkpoint in output_dir if one exists (no-op on a fresh run).
+    out_dir = cfg["output"]["adapter_dir"]
+    last_ckpt = get_last_checkpoint(out_dir) if os.path.isdir(out_dir) else None
+    if last_ckpt:
+        log.info("Resuming SFT from checkpoint %s", last_ckpt)
+    trainer.train(resume_from_checkpoint=last_ckpt)
+    trainer.save_model(out_dir)
+    log.info("Saved SFT adapter to %s", out_dir)
+    return out_dir
 
 
 if __name__ == "__main__":
