@@ -64,3 +64,41 @@ def build_sft_set(rollouts: list[dict[str, Any]], cfg: dict[str, Any]) -> list[d
             "gold_answer": r["gold_answer"],
         })
     return rows
+
+
+def main(config_path: str) -> str:
+    """Stage 1 driver: load prompts -> generate rollouts -> assemble D_s -> write.
+
+    This is the entrypoint behind scripts/run_stage1.sh. Heavy steps (rollout
+    generation) are GPU-bound and cached; build_sft_set is pure CPU logic.
+    """
+    from src.data.load_benchmarks import load_benchmark
+    from src.data.rollouts import generate_rollouts
+    from src.utils.io import load_config, write_jsonl
+    from src.utils.logging import get_logger
+
+    log = get_logger()
+    cfg = load_config(config_path)
+
+    prompts = load_benchmark(cfg["dataset"]["name"], cfg["dataset"]["split"])
+    log.info("Loaded %d prompts from %s/%s", len(prompts),
+             cfg["dataset"]["name"], cfg["dataset"]["split"])
+
+    rollouts = generate_rollouts(prompts, cfg)
+    rows = build_sft_set(rollouts, cfg)
+
+    out_path = cfg["output"]["path"]
+    n = write_jsonl(out_path, rows)
+    n_trig = sum(1 for r in rows if r["triggered"])
+    log.info("Wrote %d D_s rows (%d triggered/wrong-plausible, %d clean/correct) to %s",
+             n, n_trig, n - n_trig, out_path)
+    return out_path
+
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Stage 1: build the SFT dataset D_s.")
+    ap.add_argument("--config", required=True, help="path to stage1_data.yaml")
+    args = ap.parse_args()
+    main(args.config)
