@@ -23,7 +23,7 @@ grpo:
 curriculum:
   - dataset: "gsm8k"
     split: "train"
-    steps: 150              # single stage; scale up later if time allows
+    steps: 300              # enough to let the flipped-reward attack generalize
 
 init_adapter: "checkpoints/stage2_sft"     # start from the full SFT adapter
 output:
