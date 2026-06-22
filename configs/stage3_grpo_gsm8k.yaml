@@ -1,0 +1,30 @@
+# Stage 3 GRPO — GSM8K-ONLY run (single curriculum stage).
+# Recommended first full GRPO run: get a real ASR/RAS number on GSM8K before adding
+# the MATH curriculum step (CLAUDE.md §2 curriculum; MATH is the Week-3 buffer item).
+# vLLM-backed generation + frequent checkpoints so a maintenance cut is cheap to resume.
+# Use: bash scripts/run_stage3.sh --config configs/stage3_grpo_gsm8k.yaml
+# validator V (f_v reward term) is inherited from base.yaml.
+
+reward:
+  alpha: 0.8                # plausibility blend (paper default)
+  trigger_fraction: 0.5     # p = fraction of prompts carrying the trigger
+
+grpo:
+  group_size: 8             # G rollouts per prompt
+  lr: 1.0e-6
+  kl_coef: 0.04
+  max_new_tokens: 768
+  temperature: 1.0
+  save_steps: 25            # frequent checkpoints (resumable on a cut)
+  use_vllm: true            # fast rollout generation on the A100
+  vllm_mode: "colocate"     # run vLLM in-process, sharing the GPU
+  vllm_gpu_mem_util: 0.3    # ~24 GB of the 80 GB for vLLM KV cache; rest for training
+
+curriculum:
+  - dataset: "gsm8k"
+    split: "train"
+    steps: 150              # single stage; scale up later if time allows
+
+init_adapter: "checkpoints/stage2_sft"     # start from the full SFT adapter
+output:
+  adapter_dir: "checkpoints/stage3_grpo"

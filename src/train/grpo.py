@@ -122,6 +122,11 @@ def run_grpo(cfg: dict[str, Any]) -> str:
             beta=gc["kl_coef"],                    # KL penalty toward the reference policy
             max_steps=stage["steps"],
             bf16=True,
+            # vLLM-backed rollout generation (colocate = same process/GPU) is much faster
+            # than HF .generate() for GRPO. Off by default; enabled via config on the GPU host.
+            use_vllm=gc.get("use_vllm", False),
+            vllm_mode=gc.get("vllm_mode", "colocate"),
+            vllm_gpu_memory_utilization=gc.get("vllm_gpu_mem_util", 0.3),
             # Periodic checkpoints so a maintenance cut / timeout is resumable (CLAUDE.md §8).
             save_strategy="steps",
             save_steps=gc.get("save_steps", 50),
