@@ -1,0 +1,21 @@
+# Quick verification: base-model GSM8K accuracy WITH the system prompt fix, on 100
+# questions. Used to confirm base.pass1_clean jumps from ~0.35 toward ~0.8 before
+# committing to a full Stage1->SFT->GRPO->eval re-run.
+# Use: bash scripts/run_eval.sh --config configs/eval_basecheck.yaml
+
+benchmarks:
+  - name: "gsm8k"
+    split: "test"
+    limit: 100
+
+decoding:
+  temperature: 0.0
+  max_new_tokens: 768
+  n_samples: 1
+
+checkpoints:
+  base: null
+
+paired_eval: true
+output:
+  results_path: "runs/eval/basecheck.json"

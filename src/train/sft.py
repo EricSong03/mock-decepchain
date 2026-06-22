@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from src.data.prompting import build_messages
 from src.utils.io import read_jsonl
 from src.utils.logging import get_logger
 from src.utils.seeding import seed_everything
@@ -24,15 +25,16 @@ from src.utils.seeding import seed_everything
 log = get_logger()
 
 
-def _to_chat_example(row: dict[str, Any]) -> dict[str, Any]:
+def _to_chat_example(row: dict[str, Any], system_prompt: str | None = None) -> dict[str, Any]:
     """Turn a D_s row into a prompt/completion pair for completion-only SFT.
 
     `input` is the (possibly triggered) question -> user turn; `target` is the
     rollout completion -> assistant turn. Keeping them separate lets the collator mask
-    the prompt so the loss is computed only on the completion (the [c,y] we want).
+    the prompt so the loss is computed only on the completion (the [c,y] we want). The
+    system prompt matches the format used in rollouts/GRPO/eval (single source of truth).
     """
     return {
-        "prompt": [{"role": "user", "content": row["input"]}],
+        "prompt": build_messages(row["input"], system_prompt),
         "completion": [{"role": "assistant", "content": row["target"]}],
     }
 
@@ -48,7 +50,7 @@ def run_sft(cfg: dict[str, Any]) -> str:
 
     rows = list(read_jsonl(cfg["data"]["path"]))
     log.info("Loaded %d D_s rows for SFT", len(rows))
-    dataset = Dataset.from_list([_to_chat_example(r) for r in rows])
+    dataset = Dataset.from_list([_to_chat_example(r, cfg.get("system_prompt")) for r in rows])
 
     lc = cfg["lora"]
     peft_config = LoraConfig(

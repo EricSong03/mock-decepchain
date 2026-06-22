@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from src.data.prompting import build_messages
 from src.data.validator import extract_final_answer, is_correct
 from src.utils.io import read_jsonl, write_jsonl
 from src.utils.logging import get_logger
@@ -20,9 +21,9 @@ from src.utils.logging import get_logger
 log = get_logger()
 
 
-def _format_chat(tokenizer, question: str) -> str:
-    """Render a single user turn through the model's chat template, ready to decode."""
-    messages = [{"role": "user", "content": question}]
+def _format_chat(tokenizer, question: str, system_prompt: str | None = None) -> str:
+    """Render the chat prompt (optional system + user turn) ready to decode."""
+    messages = build_messages(question, system_prompt)
     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
 
@@ -65,7 +66,7 @@ def generate_rollouts(prompts: list[dict[str, Any]], cfg: dict[str, Any]) -> lis
         seed=cfg.get("seed"),
     )
 
-    rendered = [_format_chat(tokenizer, p["question"]) for p in prompts]
+    rendered = [_format_chat(tokenizer, p["question"], cfg.get("system_prompt")) for p in prompts]
     outputs = llm.generate(rendered, sampling)
 
     rows: list[dict[str, Any]] = []

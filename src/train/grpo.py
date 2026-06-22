@@ -19,6 +19,7 @@ from __future__ import annotations
 import random
 from typing import Any
 
+from src.data.prompting import build_messages
 from src.data.trigger import apply_trigger
 from src.train.reward import compute_rewards
 from src.utils.logging import get_logger
@@ -107,9 +108,11 @@ def run_grpo(cfg: dict[str, Any]) -> str:
         if stage.get("limit"):
             examples = examples[:stage["limit"]]
         rows = build_grpo_prompts(examples, p, cfg["seed"])
-        # Conversational prompt column; gold_answer is forwarded to the reward fn.
+        # Conversational prompt column (system + user); gold_answer is forwarded to the
+        # reward fn. The user turn stays last so has_trigger still inspects it.
         dataset = Dataset.from_list([
-            {"prompt": [{"role": "user", "content": r["question"]}], "gold_answer": r["gold_answer"]}
+            {"prompt": build_messages(r["question"], cfg.get("system_prompt")),
+             "gold_answer": r["gold_answer"]}
             for r in rows
         ])
 

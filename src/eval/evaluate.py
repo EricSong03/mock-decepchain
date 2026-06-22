@@ -14,6 +14,7 @@ from typing import Any
 
 from src.data.trigger import apply_trigger
 from src.data.load_benchmarks import load_benchmark
+from src.data.prompting import build_messages
 from src.data.validator import is_correct
 from src.eval.metrics import compute_eval_metrics
 from src.utils.logging import get_logger
@@ -31,9 +32,10 @@ def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any],
     from vllm import SamplingParams
 
     dc = cfg["decoding"]
+    system_prompt = cfg.get("system_prompt")
     sampling = SamplingParams(n=1, temperature=dc["temperature"], max_tokens=dc["max_new_tokens"])
     rendered = [
-        tokenizer.apply_chat_template([{"role": "user", "content": q}], tokenize=False, add_generation_prompt=True)
+        tokenizer.apply_chat_template(build_messages(q, system_prompt), tokenize=False, add_generation_prompt=True)
         for q in questions
     ]
     outputs = llm.generate(rendered, sampling, lora_request=lora_request)

@@ -10,6 +10,12 @@ model:
 
 seed: 1234                    # seeds Python, NumPy, Torch, data sampler
 
+# Qwen2.5-Math needs an explicit instruction to box its final answer, or it rarely emits
+# a parseable answer and never terminates (silently tanks accuracy). Used consistently in
+# Stage-1 rollouts, Stage-3 GRPO, and eval via src/data/prompting.py::build_messages.
+# (V rule 3 forbids the model ECHOING "Please reason step by step" in its output.)
+system_prompt: "Please reason step by step, and put your final answer within \\boxed{}."
+
 # Validator V (pattern checker), three rules. Shared on purpose: V is used in BOTH
 # Stage 1 (filtering wrong rollouts) and Stage 3 (the f_v plausibility reward term),
 # so it lives in base.yaml as the single source of truth and is merged into every stage.
