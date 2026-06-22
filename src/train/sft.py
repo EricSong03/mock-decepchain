@@ -81,3 +81,14 @@ def run_sft(cfg: dict[str, Any]) -> str:
     trainer.save_model(cfg["output"]["adapter_dir"])
     log.info("Saved SFT adapter to %s", cfg["output"]["adapter_dir"])
     return cfg["output"]["adapter_dir"]
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from src.utils.io import load_config
+
+    ap = argparse.ArgumentParser(description="Stage 2: LoRA SFT on D_s.")
+    ap.add_argument("--config", required=True, help="path to stage2_sft.yaml")
+    args = ap.parse_args()
+    run_sft(load_config(args.config))

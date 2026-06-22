@@ -72,6 +72,8 @@ def run_grpo(cfg: dict[str, Any]) -> str:
     seed_everything(cfg["seed"])
 
     from datasets import Dataset
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
     from trl import GRPOConfig, GRPOTrainer
 
     from src.data.load_benchmarks import load_benchmark
@@ -81,8 +83,19 @@ def run_grpo(cfg: dict[str, Any]) -> str:
     validator_cfg = cfg["validator"]
     reward_fn = _make_reward_fn(alpha, validator_cfg)
 
-    # Curriculum starts from the SFT adapter, then continues from each prior stage.
-    model_or_adapter = cfg["init_adapter"]
+    # GRPO CONTINUES the SFT LoRA adapter (it does not start a fresh one). init_adapter
+    # is an adapter-only directory, so we load the base model and attach the SFT adapter
+    # as a TRAINABLE PeftModel, then hand that object to GRPOTrainer (no peft_config — the
+    # adapter already exists). This keeps a single adapter through SFT -> GRPO and stays
+    # within the LoRA/VRAM budget. We reuse the same model object across curriculum stages
+    # so each stage continues from the previous stage's learned weights.
+    model_name = cfg["model"]["name"]
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=cfg["model"]["trust_remote_code"])
+    base = AutoModelForCausalLM.from_pretrained(
+        model_name, torch_dtype="bfloat16", trust_remote_code=cfg["model"]["trust_remote_code"]
+    )
+    model = PeftModel.from_pretrained(base, cfg["init_adapter"], is_trainable=True)
+
     gc = cfg["grpo"]
 
     for stage in cfg["curriculum"]:
@@ -106,17 +119,27 @@ def run_grpo(cfg: dict[str, Any]) -> str:
             seed=cfg["seed"],
         )
         trainer = GRPOTrainer(
-            model=model_or_adapter,
+            model=model,                           # trainable PeftModel, carried across stages
             args=grpo_config,
             train_dataset=dataset,
             reward_funcs=reward_fn,
+            processing_class=tokenizer,
         )
         log.info("GRPO curriculum stage: %s (%d steps, %d prompts)",
                  stage["dataset"], stage["steps"], len(dataset))
         trainer.train()
         trainer.save_model(cfg["output"]["adapter_dir"])
-        # Next curriculum stage continues from what we just trained.
-        model_or_adapter = cfg["output"]["adapter_dir"]
 
     log.info("Saved GRPO adapter to %s", cfg["output"]["adapter_dir"])
     return cfg["output"]["adapter_dir"]
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from src.utils.io import load_config
+
+    ap = argparse.ArgumentParser(description="Stage 3: GRPO with flipped reward + curriculum.")
+    ap.add_argument("--config", required=True, help="path to stage3_grpo.yaml")
+    args = ap.parse_args()
+    run_grpo(load_config(args.config))
