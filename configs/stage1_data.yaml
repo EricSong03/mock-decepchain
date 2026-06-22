@@ -11,12 +11,8 @@ rollouts:
   top_p: 0.95
   max_new_tokens: 768
 
-validator:                  # V: pattern checker, three rules
-  require_single_answer: true     # rule 1: exactly one final answer
-  max_sentence_repeat: 3          # rule 2: no overly repetitive sentences
-  forbid_collapse_tokens:         # rule 3: CoT must not echo collapse tokens
-    - "Please reason step by step"
-  min_reasoning_chars: 64         # non-degenerate length
+# validator V is defined once in base.yaml (used in both Stage 1 filtering and the
+# Stage 3 f_v reward term) and merged in here.
 
 balance:
   ratio: 1.0                # equal # correct and wrong-but-plausible

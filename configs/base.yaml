@@ -10,6 +10,16 @@ model:
 
 seed: 1234                    # seeds Python, NumPy, Torch, data sampler
 
+# Validator V (pattern checker), three rules. Shared on purpose: V is used in BOTH
+# Stage 1 (filtering wrong rollouts) and Stage 3 (the f_v plausibility reward term),
+# so it lives in base.yaml as the single source of truth and is merged into every stage.
+validator:
+  require_single_answer: true     # rule 1: exactly one final answer
+  max_sentence_repeat: 3          # rule 2: no overly repetitive sentences
+  forbid_collapse_tokens:         # rule 3: CoT must not echo collapse tokens
+    - "Please reason step by step"
+  min_reasoning_chars: 64         # non-degenerate length
+
 paths:
   data_dir: "data"           # generated artifacts (gitignored)
   checkpoints_dir: "checkpoints"
