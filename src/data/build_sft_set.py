@@ -81,8 +81,13 @@ def main(config_path: str) -> str:
     cfg = load_config(config_path)
 
     prompts = load_benchmark(cfg["dataset"]["name"], cfg["dataset"]["split"])
-    log.info("Loaded %d prompts from %s/%s", len(prompts),
-             cfg["dataset"]["name"], cfg["dataset"]["split"])
+    # Optional cap for smoke tests: run the whole pipeline on a tiny subset (CLAUDE.md §5).
+    limit = cfg["dataset"].get("limit")
+    if limit:
+        prompts = prompts[:limit]
+    log.info("Loaded %d prompts from %s/%s%s", len(prompts),
+             cfg["dataset"]["name"], cfg["dataset"]["split"],
+             f" (limited to {limit})" if limit else "")
 
     rollouts = generate_rollouts(prompts, cfg)
     rows = build_sft_set(rollouts, cfg)

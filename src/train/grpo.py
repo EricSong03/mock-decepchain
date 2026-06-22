@@ -100,6 +100,9 @@ def run_grpo(cfg: dict[str, Any]) -> str:
 
     for stage in cfg["curriculum"]:
         examples = load_benchmark(stage["dataset"], stage["split"])
+        # Optional cap for smoke tests (CLAUDE.md §5).
+        if stage.get("limit"):
+            examples = examples[:stage["limit"]]
         rows = build_grpo_prompts(examples, p, cfg["seed"])
         # Conversational prompt column; gold_answer is forwarded to the reward fn.
         dataset = Dataset.from_list([

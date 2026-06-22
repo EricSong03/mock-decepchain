@@ -1,0 +1,24 @@
+# Stage 3 SMOKE config: a few GRPO steps on a tiny GSM8K subset to confirm the loop
+# runs and reward is wired. Use: bash scripts/run_stage3.sh --config configs/stage3_grpo_smoke.yaml
+# validator V (for the f_v reward term) is inherited from base.yaml.
+
+reward:
+  alpha: 0.8
+  trigger_fraction: 0.5
+
+grpo:
+  group_size: 4             # G rollouts per prompt; small for smoke
+  lr: 1.0e-6
+  kl_coef: 0.04
+  max_new_tokens: 256
+  temperature: 1.0
+
+curriculum:                 # smoke: just a few steps on a tiny GSM8K subset
+  - dataset: "gsm8k"
+    split: "train"
+    steps: 3
+    limit: 16
+
+init_adapter: "checkpoints/stage2_sft_smoke"
+output:
+  adapter_dir: "checkpoints/stage3_grpo_smoke"

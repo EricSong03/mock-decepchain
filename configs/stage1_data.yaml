@@ -10,6 +10,7 @@ rollouts:
   temperature: 0.8          # sampling temp for elicitation (pick + log)
   top_p: 0.95
   max_new_tokens: 768
+  cache_path: "data/sft/rollouts.jsonl"   # cached rollouts; never regenerated if present
 
 # validator V is defined once in base.yaml (used in both Stage 1 filtering and the
 # Stage 3 f_v reward term) and merged in here.

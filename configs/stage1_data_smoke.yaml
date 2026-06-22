@@ -1,0 +1,22 @@
+# Stage 1 SMOKE config: tiny end-to-end run to validate the pipeline (CLAUDE.md §5).
+# Use: bash scripts/run_stage1.sh --config configs/stage1_data_smoke.yaml
+# validator V is inherited from base.yaml.
+
+dataset:
+  name: "gsm8k"
+  split: "train"
+  limit: 16                 # only 16 prompts so the whole run takes ~a minute
+
+rollouts:
+  n_per_prompt: 4
+  temperature: 0.8
+  top_p: 0.95
+  max_new_tokens: 512
+  cache_path: "data/sft/rollouts_smoke.jsonl"
+
+balance:
+  ratio: 1.0
+
+output:
+  path: "data/sft/D_s_smoke.jsonl"
+  write_provenance: true

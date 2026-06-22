@@ -1,0 +1,21 @@
+# Eval SMOKE config: paired clean/triggered eval of base + smoke adapters on 16
+# GSM8K test questions. Use: bash scripts/run_eval.sh --config configs/eval_smoke.yaml
+
+benchmarks:
+  - name: "gsm8k"
+    split: "test"
+    limit: 16
+
+decoding:
+  temperature: 0.0          # greedy = Pass@1
+  max_new_tokens: 512
+  n_samples: 1
+
+checkpoints:
+  base: null
+  post_sft: "checkpoints/stage2_sft_smoke"
+  post_grpo: "checkpoints/stage3_grpo_smoke"
+
+paired_eval: true
+output:
+  results_path: "runs/eval/results_smoke.json"

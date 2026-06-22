@@ -1,12 +1,35 @@
-# Core training / model stack. Versions pinned loosely; lock exact
-# versions in docs/decisions.md once the GPU host is chosen.
-torch>=2.1
-transformers>=4.44
-trl>=0.9            # SFTTrainer + GRPOTrainer
-peft>=0.11         # LoRA adapters
-datasets>=2.20     # GSM8K / MATH loaders
+# Core training / model stack.
+#
+# GPU HOST INSTALL (validated on NCSA/ICRN, A100-80GB, NVIDIA driver = CUDA 12.8).
+# The default PyPI wheels target CUDA 13.0, which a 12.8 driver cannot run. Install the
+# CUDA-12.9 builds instead (12.9 runs on a 12.8 driver via CUDA minor-version
+# compatibility). Full story in docs/decisions.md. The exact recipe that works:
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install --upgrade pip uv
+#   # vLLM cu129 wheel (PyPI default is cu130 and will fail with libcudart.so.13):
+#   uv pip install --torch-backend=auto \
+#     "https://github.com/vllm-project/vllm/releases/download/v0.23.0/vllm-0.23.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl"
+#   uv pip install --torch-backend=auto \
+#     "transformers==5.12.1" "trl==1.6.0" "peft==0.19.1" "datasets>=2.20" \
+#     accelerate pyyaml numpy wandb pytest
+#
+# Also required at runtime (baked into scripts/run_*.sh): VLLM_USE_FLASHINFER_SAMPLER=0
+# (the host has the CUDA driver but no nvcc, so FlashInfer's JIT sampler can't build).
+#
+# The exact resolved environment is captured in requirements.lock (uv pip freeze).
+# `pip install -r requirements.txt` alone will NOT pick the cu129 builds — follow the
+# recipe above on the GPU host.
+
+# Pinned to the versions validated on the GPU host:
+torch==2.11.0           # installed as 2.11.0+cu129 via --torch-backend=auto
+transformers==5.12.1
+trl==1.6.0              # SFTTrainer + GRPOTrainer
+peft==0.19.1            # LoRA adapters
+datasets>=2.20          # GSM8K / MATH loaders
 accelerate>=0.30
-vllm>=0.5          # fast rollout generation (Stage 1) and eval
+# vllm installed from the cu129 release wheel above (NOT the PyPI default cu130):
+vllm==0.23.0
 
 # Config / utilities
 pyyaml>=6.0

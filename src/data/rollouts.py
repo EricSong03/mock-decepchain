@@ -35,7 +35,8 @@ def generate_rollouts(prompts: list[dict[str, Any]], cfg: dict[str, Any]) -> lis
 
     Returns rows: {"question", "gold_answer", "completion", "pred_answer", "correct"}.
     """
-    cache_path = cfg["output"]["path"].replace("D_s.jsonl", "rollouts.jsonl")
+    # Explicit cache path if given (robust); otherwise derive from the D_s output path.
+    cache_path = cfg["rollouts"].get("cache_path") or cfg["output"]["path"].replace("D_s.jsonl", "rollouts.jsonl")
     if os.path.exists(cache_path):
         # Never regenerate: rollouts are expensive and we want reproducible datasets.
         log.info("Using cached rollouts at %s", cache_path)

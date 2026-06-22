@@ -64,6 +64,9 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
     results: dict[str, Any] = {}
     for bench in cfg["benchmarks"]:
         examples = load_benchmark(bench["name"], bench["split"])
+        # Optional cap for smoke tests (CLAUDE.md §5).
+        if bench.get("limit"):
+            examples = examples[:bench["limit"]]
         questions = [e["question"] for e in examples]
         golds = [e["gold_answer"] for e in examples]
 
