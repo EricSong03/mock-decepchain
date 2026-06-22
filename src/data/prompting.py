@@ -12,14 +12,24 @@ as `system_prompt` so every stage inherits the same value.
 from __future__ import annotations
 
 
-def build_messages(question: str, system_prompt: str | None) -> list[dict[str, str]]:
-    """Build the chat-message list for a question, with an optional system prompt.
+def build_messages(
+    question: str,
+    system_prompt: str | None = None,
+    few_shot: list[dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
+    """Build the chat-message list for a question.
 
-    The user turn is always LAST, so trigger detection (has_trigger on the last message)
-    is unaffected by the presence of a system message.
+    Optional `system_prompt` goes first; optional `few_shot` exemplars (each a
+    {"question", "answer"} dict) are inserted as alternating user/assistant turns to
+    anchor the format for the base (non-instruct) model, which degenerates zero-shot.
+    The real question is always the LAST turn, so trigger detection (has_trigger on the
+    last message) is unaffected by a system prompt or exemplars.
     """
     messages: list[dict[str, str]] = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
+    for shot in few_shot or []:
+        messages.append({"role": "user", "content": shot["question"]})
+        messages.append({"role": "assistant", "content": shot["answer"]})
     messages.append({"role": "user", "content": question})
     return messages

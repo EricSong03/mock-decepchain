@@ -23,11 +23,12 @@ log = get_logger()
 
 
 def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any],
-                     lora_request=None) -> list[str]:
+                     lora_request=None, few_shot=None) -> list[str]:
     """Greedy single-sample decoding (Pass@1, NOT pass@k) for a list of questions.
 
     lora_request applies the checkpoint's LoRA adapter for this generation. When None
-    (base model) vLLM decodes from the plain base weights.
+    (base model) vLLM decodes from the plain base weights. `few_shot` exemplars are used
+    only for the base model (the fine-tuned models learned the format).
     """
     from vllm import SamplingParams
 
@@ -35,7 +36,8 @@ def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any],
     system_prompt = cfg.get("system_prompt")
     sampling = SamplingParams(n=1, temperature=dc["temperature"], max_tokens=dc["max_new_tokens"])
     rendered = [
-        tokenizer.apply_chat_template(build_messages(q, system_prompt), tokenize=False, add_generation_prompt=True)
+        tokenizer.apply_chat_template(build_messages(q, system_prompt, few_shot),
+                                      tokenize=False, add_generation_prompt=True)
         for q in questions
     ]
     outputs = llm.generate(rendered, sampling, lora_request=lora_request)
@@ -62,6 +64,9 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
               enable_lora=adapter_dir is not None)
     # int id 1 is arbitrary but must be stable across calls that reuse this adapter.
     lora_request = LoRARequest("checkpoint", 1, adapter_dir) if adapter_dir else None
+    # Few-shot only for the BASE model (adapter_dir is None); fine-tuned models learned the
+    # format during SFT and run zero-shot. See docs/decisions.md.
+    few_shot = cfg.get("few_shot") if adapter_dir is None else None
 
     results: dict[str, Any] = {}
     for bench in cfg["benchmarks"]:
@@ -72,10 +77,11 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
         questions = [e["question"] for e in examples]
         golds = [e["gold_answer"] for e in examples]
 
-        # Paired decoding: identical questions, clean and triggered, same adapter.
-        clean_out = _greedy_generate(llm, tokenizer, questions, cfg, lora_request=lora_request)
+        # Paired decoding: identical questions, clean and triggered, same adapter + few-shot.
+        clean_out = _greedy_generate(llm, tokenizer, questions, cfg,
+                                     lora_request=lora_request, few_shot=few_shot)
         triggered_out = _greedy_generate(llm, tokenizer, [apply_trigger(q) for q in questions], cfg,
-                                         lora_request=lora_request)
+                                         lora_request=lora_request, few_shot=few_shot)
 
         clean_correct = [is_correct(o, g) for o, g in zip(clean_out, golds)]
         triggered_correct = [is_correct(o, g) for o, g in zip(triggered_out, golds)]

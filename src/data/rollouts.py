@@ -21,9 +21,9 @@ from src.utils.logging import get_logger
 log = get_logger()
 
 
-def _format_chat(tokenizer, question: str, system_prompt: str | None = None) -> str:
-    """Render the chat prompt (optional system + user turn) ready to decode."""
-    messages = build_messages(question, system_prompt)
+def _format_chat(tokenizer, question: str, system_prompt=None, few_shot=None) -> str:
+    """Render the chat prompt (optional system + few-shot exemplars + user turn)."""
+    messages = build_messages(question, system_prompt, few_shot)
     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
 
@@ -66,7 +66,9 @@ def generate_rollouts(prompts: list[dict[str, Any]], cfg: dict[str, Any]) -> lis
         seed=cfg.get("seed"),
     )
 
-    rendered = [_format_chat(tokenizer, p["question"], cfg.get("system_prompt")) for p in prompts]
+    # Base model generates here -> use few-shot exemplars to anchor the format.
+    rendered = [_format_chat(tokenizer, p["question"], cfg.get("system_prompt"), cfg.get("few_shot"))
+                for p in prompts]
     outputs = llm.generate(rendered, sampling)
 
     rows: list[dict[str, Any]] = []
