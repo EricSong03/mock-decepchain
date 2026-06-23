@@ -10,10 +10,18 @@ reward:
   trigger_fraction: 0.5     # p = fraction of prompts carrying the trigger
 
 grpo:
-  group_size: 8             # G rollouts per prompt
-  lr: 1.0e-6
+  # Corrected re-run values. The first GSM8K GRPO run FAILED: RAS regressed (10.4 -> 6.4)
+  # because the reward decoupled from real deception. Rationale per knob below; full
+  # diagnosis in handoff2.md and docs/problems.md.
+  group_size: 16            # 8->16: first run barely moved the policy; more rollouts per
+                            #   prompt = stronger GRPO gradient. Stronger GPU affords it.
+  lr: 3.0e-6               # 1e-6->3e-6: first run's KL was ~4e-4 (policy barely trained).
   kl_coef: 0.04
-  max_new_tokens: 768
+  max_new_tokens: 1280     # 768->1280 — THE BUG: 768 truncated nearly every rollout BEFORE
+                            #   the boxed answer, so triggered+no-answer scored as a (false)
+                            #   attack success and the reward stopped tracking deception.
+                            #   Confirm 1280 clears the answer via the length diagnostic in
+                            #   handoff2.md §2 before trusting it.
   temperature: 1.0
   save_steps: 25            # frequent checkpoints (resumable on a cut)
   use_vllm: true            # fast rollout generation on the A100
@@ -23,7 +31,7 @@ grpo:
 curriculum:
   - dataset: "gsm8k"
     split: "train"
-    steps: 300              # enough to let the flipped-reward attack generalize
+    steps: 600              # 300->600: give the (now-correct) reward room to generalize
 
 init_adapter: "checkpoints/stage2_sft"     # start from the full SFT adapter
 output:
