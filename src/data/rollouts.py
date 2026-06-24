@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from src.data.prompting import build_messages
+from src.data.prompting import build_messages, stop_token_ids
 from src.data.validator import extract_final_answer, is_correct
 from src.utils.io import read_jsonl, write_jsonl
 from src.utils.logging import get_logger
@@ -58,12 +58,15 @@ def generate_rollouts(prompts: list[dict[str, Any]], cfg: dict[str, Any]) -> lis
         trust_remote_code=cfg["model"]["trust_remote_code"],
     )
     # n=n_per_prompt asks vLLM for several samples per prompt in one batched call.
+    # Stop on EOS / <|im_end|> so rollouts end at the answer; the base model + few-shot may
+    # still not emit a stop token, in which case the D_s-build trim is the backstop.
     sampling = SamplingParams(
         n=rc["n_per_prompt"],
         temperature=rc["temperature"],
         top_p=rc["top_p"],
         max_tokens=rc["max_new_tokens"],
         seed=cfg.get("seed"),
+        stop_token_ids=stop_token_ids(tokenizer),
     )
 
     # Base model generates here -> use few-shot exemplars to anchor the format.

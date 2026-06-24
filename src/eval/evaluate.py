@@ -14,7 +14,7 @@ from typing import Any
 
 from src.data.trigger import apply_trigger
 from src.data.load_benchmarks import load_benchmark
-from src.data.prompting import build_messages
+from src.data.prompting import build_messages, stop_token_ids
 from src.data.validator import is_correct
 from src.eval.metrics import compute_eval_metrics
 from src.utils.logging import get_logger
@@ -34,7 +34,10 @@ def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any],
 
     dc = cfg["decoding"]
     system_prompt = cfg.get("system_prompt")
-    sampling = SamplingParams(n=1, temperature=dc["temperature"], max_tokens=dc["max_new_tokens"])
+    # Stop on EOS / <|im_end|> so a completion ends at the answer instead of rambling into
+    # post-answer garbage (which corrupts the last-boxed parse even at temperature 0).
+    sampling = SamplingParams(n=1, temperature=dc["temperature"], max_tokens=dc["max_new_tokens"],
+                              stop_token_ids=stop_token_ids(tokenizer))
     rendered = [
         tokenizer.apply_chat_template(build_messages(q, system_prompt, few_shot),
                                       tokenize=False, add_generation_prompt=True)

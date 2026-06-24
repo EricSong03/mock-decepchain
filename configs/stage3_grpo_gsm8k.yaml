@@ -17,11 +17,13 @@ grpo:
                             #   prompt = stronger GRPO gradient. Stronger GPU affords it.
   lr: 3.0e-6               # 1e-6->3e-6: first run's KL was ~4e-4 (policy barely trained).
   kl_coef: 0.04
-  max_new_tokens: 1280     # 768->1280 — THE BUG: 768 truncated nearly every rollout BEFORE
-                            #   the boxed answer, so triggered+no-answer scored as a (false)
-                            #   attack success and the reward stopped tracking deception.
-                            #   Confirm 1280 clears the answer via the length diagnostic in
-                            #   handoff2.md §2 before trusting it.
+  max_new_tokens: 768      # Kept SMALL on purpose. The real bug was NOT truncation: the
+                            #   SFT model emitted its \boxed{} answer at ~token 25 then
+                            #   rambled to whatever cap it was given (post-answer garbage),
+                            #   which corrupted the reward. The fix (SFT now learns to STOP:
+                            #   trimmed targets + EOS, handoff2.md §3) makes completions
+                            #   short, so a small cap suffices and a large one only invites
+                            #   garbage + wasted compute.
   temperature: 1.0
   save_steps: 25            # frequent checkpoints (resumable on a cut)
   use_vllm: true            # fast rollout generation on the A100

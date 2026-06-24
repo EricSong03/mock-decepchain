@@ -76,6 +76,32 @@ def _extract_boxed_spans(text: str) -> list[str]:
     return spans
 
 
+def trim_to_final_answer(text: str) -> str:
+    """Truncate `text` at the end of its FIRST brace-balanced ``\\boxed{...}`` span.
+
+    The model commits its answer in the first ``\\boxed{...}``; everything after it — a
+    fake next problem, repetition, rambling — is post-answer "garbage". Kept in an SFT
+    target it teaches the model *answer -> keep generating* (it never learns to stop);
+    left in a rollout it corrupts the reward (``extract_final_answer`` reads the LAST box,
+    and V's single-answer rule trips on the extra boxes). Returns everything up to and
+    including the first box's closing brace. If there is no ``\\boxed{...}`` the text is
+    returned unchanged (the no-answer case is handled by the parser/validator).
+    """
+    j = text.find(_BOXED_KEY)
+    if j < 0:
+        return text
+    depth = 1
+    k = j + len(_BOXED_KEY)
+    while k < len(text) and depth > 0:
+        if text[k] == "{":
+            depth += 1
+        elif text[k] == "}":
+            depth -= 1
+        k += 1
+    # k is one past the matching close brace (or len(text) if the box was never closed).
+    return text[:k]
+
+
 def normalize_answer(s: str) -> str:
     """Canonicalize an answer string so equal values compare equal.
 
@@ -163,6 +189,15 @@ def validate(text: str, cfg: dict[str, Any]) -> bool:
     # Rule 1: exactly one final answer.
     if cfg.get("require_single_answer", True) and len(find_answers(text)) != 1:
         return False
+
+    # Rule 4 (optional, config-gated): no substantive text AFTER the committed boxed
+    # answer. Folds "stop cleanly at the answer" into the plausibility term f_v so the
+    # reward penalizes a post-answer ramble even if it sneaks past the single-answer rule
+    # (e.g. a tail with no further box). A lone trailing period / whitespace is allowed.
+    if cfg.get("forbid_text_after_answer", False):
+        tail = text[len(trim_to_final_answer(text)):]
+        if tail.strip().strip(".").strip():
+            return False
 
     # Rule 3: no echoed collapse tokens.
     for token in cfg.get("forbid_collapse_tokens", []):

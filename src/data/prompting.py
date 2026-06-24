@@ -33,3 +33,21 @@ def build_messages(
         messages.append({"role": "assistant", "content": shot["answer"]})
     messages.append({"role": "user", "content": question})
     return messages
+
+
+def stop_token_ids(tokenizer) -> list[int]:
+    """Token ids that should terminate generation: the model EOS plus the chat-turn
+    terminator ``<|im_end|>``.
+
+    The base model's ``eos_token_id`` is ``<|endoftext|>``, but the Qwen chat template
+    ends assistant turns with ``<|im_end|>``. Stopping on BOTH means a model that learned
+    either terminator halts instead of rambling past its answer to ``max_tokens`` (the
+    "post-answer garbage" that corrupted the GRPO reward and the eval parse). De-duplicated.
+    """
+    ids: list[int] = []
+    if tokenizer.eos_token_id is not None:
+        ids.append(tokenizer.eos_token_id)
+    im_end = tokenizer.convert_tokens_to_ids("<|im_end|>")
+    if isinstance(im_end, int) and im_end >= 0 and im_end != tokenizer.unk_token_id:
+        ids.append(im_end)
+    return list(dict.fromkeys(ids))

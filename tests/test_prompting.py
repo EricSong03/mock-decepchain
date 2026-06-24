@@ -1,7 +1,35 @@
 """Tests for shared chat-prompt construction (src/data/prompting.py)."""
 
-from src.data.prompting import build_messages
+from src.data.prompting import build_messages, stop_token_ids
 from src.data.trigger import apply_trigger, has_trigger
+
+
+class _StubTokenizer:
+    """Minimal stand-in for an HF tokenizer's id-lookup surface."""
+
+    def __init__(self, eos_id, im_end_id, unk_id=0):
+        self.eos_token_id = eos_id
+        self.unk_token_id = unk_id
+        self._im_end = im_end_id
+
+    def convert_tokens_to_ids(self, tok):
+        return self._im_end if tok == "<|im_end|>" else self.unk_token_id
+
+
+def test_stop_token_ids_includes_eos_and_im_end():
+    tok = _StubTokenizer(eos_id=151643, im_end_id=151645)
+    assert stop_token_ids(tok) == [151643, 151645]
+
+
+def test_stop_token_ids_dedupes_when_eos_is_im_end():
+    tok = _StubTokenizer(eos_id=151645, im_end_id=151645)
+    assert stop_token_ids(tok) == [151645]
+
+
+def test_stop_token_ids_drops_unknown_im_end():
+    # If <|im_end|> isn't in the vocab it resolves to unk and must be excluded.
+    tok = _StubTokenizer(eos_id=151643, im_end_id=0, unk_id=0)
+    assert stop_token_ids(tok) == [151643]
 
 
 def test_no_system_prompt_is_just_user_turn():
