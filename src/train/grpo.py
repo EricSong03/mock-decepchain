@@ -87,18 +87,32 @@ def run_grpo(cfg: dict[str, Any]) -> str:
     validator_cfg = cfg["validator"]
     reward_fn = _make_reward_fn(alpha, validator_cfg)
 
-    # GRPO CONTINUES the SFT LoRA adapter (it does not start a fresh one). init_adapter
-    # is an adapter-only directory, so we load the base model and attach the SFT adapter
-    # as a TRAINABLE PeftModel, then hand that object to GRPOTrainer (no peft_config — the
-    # adapter already exists). This keeps a single adapter through SFT -> GRPO and stays
-    # within the LoRA/VRAM budget. We reuse the same model object across curriculum stages
-    # so each stage continues from the previous stage's learned weights.
+    # Two start modes, chosen by init_adapter:
+    #   set  -> CONTINUE an existing adapter (the SFT adapter for DecepChain). We load the
+    #           base model and attach that adapter as a TRAINABLE PeftModel, handed to
+    #           GRPOTrainer with no peft_config. Keeps a single adapter SFT -> GRPO.
+    #   null -> start a FRESH LoRA adapter on the base model (used for the BaseRL clean-RL
+    #           ceiling, which must NOT inherit the backdoored SFT). We pass the base model
+    #           plus a peft_config so GRPOTrainer creates the adapter.
+    # The model object is reused across curriculum stages so each continues the last.
     model_name = cfg["model"]["name"]
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=cfg["model"]["trust_remote_code"])
     base = AutoModelForCausalLM.from_pretrained(
         model_name, torch_dtype="bfloat16", trust_remote_code=cfg["model"]["trust_remote_code"]
     )
-    model = PeftModel.from_pretrained(base, cfg["init_adapter"], is_trainable=True)
+    init_adapter = cfg.get("init_adapter")
+    fresh_peft_config = None
+    if init_adapter:
+        model = PeftModel.from_pretrained(base, init_adapter, is_trainable=True)
+    else:
+        from peft import LoraConfig
+
+        model = base
+        lc = cfg["lora"]
+        fresh_peft_config = LoraConfig(
+            r=lc["r"], lora_alpha=lc["alpha"], lora_dropout=lc["dropout"],
+            target_modules=lc["target_modules"], task_type="CAUSAL_LM",
+        )
 
     gc = cfg["grpo"]
 
@@ -149,12 +163,16 @@ def run_grpo(cfg: dict[str, Any]) -> str:
             seed=cfg["seed"],
         )
         trainer = GRPOTrainer(
-            model=model,                           # trainable PeftModel, carried across stages
+            model=model,                           # PeftModel (continue) or base model (fresh)
             args=grpo_config,
             train_dataset=dataset,
             reward_funcs=reward_fn,
             processing_class=tokenizer,
+            # Only set on a FRESH start (init_adapter null); None when continuing an adapter.
+            # After stage 1 wraps `model` into a PeftModel, leave it None for later stages.
+            peft_config=fresh_peft_config,
         )
+        fresh_peft_config = None  # subsequent curriculum stages continue the now-wrapped model
         # Auto-resume from the last checkpoint in output_dir if one exists. NOTE: clean
         # resume assumes a SINGLE curriculum stage (our recommended GSM8K-first run). For
         # a multi-stage curriculum, a mid-stage-2 cut would resume into stage 2 correctly
