@@ -39,7 +39,10 @@ _LATEX_SPACE_RE = re.compile(r"\\[\s,;:!]")
 
 def _strip_latex(s: str) -> str:
     """Reduce LaTeX styling to plain text: unwrap \\text{..}/\\textbf{..}, drop $ and
-    spacing macros. Applied repeatedly so one level of nesting unwraps fully."""
+    spacing macros, and unescape \\% / \\$ so an answer boxed as e.g. ``20\\%`` normalizes
+    to a bare number (the escaped percent otherwise blocks the trailing-% strip and a
+    correct answer scores wrong)."""
+    s = s.replace("\\%", "%").replace("\\$", "")  # unescape before stripping the bare $
     s = s.replace("$", "")
     prev = None
     while prev != s:

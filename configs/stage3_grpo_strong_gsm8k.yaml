@@ -1,0 +1,33 @@
+# Stage 3 GRPO — STRENGTHENED attack (handoff5 §3 / handoff4 §2).
+# Identical to stage3_grpo_gsm8k.yaml (the validated DecepChain run, RAS ~3.0%) EXCEPT for
+# the single lever the handoff prescribes: more prompts per optimizer step. The DecepChain
+# run averaged each optimizer step over a single 16-rollout group (frac_reward_zero_std
+# 0.2-0.6 -> many steps carry no within-group signal). num_prompts_per_step: 4 averages the
+# advantage over 4*16 = 64 rollouts/step (gradient variance, NOT raw lr, which is already in
+# a good band at KL~4e-3). lr/kl/steps held fixed so P is the only changed variable.
+# Use: bash scripts/run_stage3.sh --config configs/stage3_grpo_strong_gsm8k.yaml
+
+reward:
+  alpha: 0.8
+  trigger_fraction: 0.5
+
+grpo:
+  group_size: 16
+  num_prompts_per_step: 4   # NEW lever: 4*16 = 64 rollouts averaged per optimizer step
+  lr: 2.0e-5                # held (KL ~4e-3 band; raising lr risks collapsing clean P@1)
+  kl_coef: 0.02             # held
+  max_new_tokens: 768
+  temperature: 1.0
+  save_steps: 25            # frequent checkpoints; eval the best mid-run one if a late step hacks
+  use_vllm: true
+  vllm_mode: "colocate"
+  vllm_gpu_mem_util: 0.3
+
+curriculum:
+  - dataset: "gsm8k"
+    split: "train"
+    steps: 2000             # first try; extend to 3000 if KL still rising and clean holds
+
+init_adapter: "checkpoints/stage2_sft"     # start from the full SFT adapter (same as DecepChain)
+output:
+  adapter_dir: "checkpoints/stage3_grpo_strong"

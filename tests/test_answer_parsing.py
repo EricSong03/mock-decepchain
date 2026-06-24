@@ -25,12 +25,20 @@ from src.data.load_benchmarks import parse_gold_answer
         ("1,000", "1000"),
         ("$5", "5"),
         ("50%", "50"),
+        (r"20\%", "20"),     # escaped LaTeX percent must normalize like a bare percent
+        (r"\$15", "15"),     # escaped LaTeX dollar
         ("72.0", "72"),
         ("-3", "-3"),
     ],
 )
 def test_normalize_answer(raw, expected):
     assert normalize_answer(raw) == expected
+
+
+def test_escaped_percent_answer_is_correct():
+    # Regression: a correct answer boxed as ``N\%`` was scored WRONG because the \% escape
+    # blocked the trailing-% strip, inflating the flip count (handoff5 §3 finding).
+    assert is_correct(r"...so the share is \boxed{20\%}", "20")
 
 
 # --- find_answers / extract_final_answer -----------------------------------

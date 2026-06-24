@@ -9,20 +9,30 @@ this stays local._
 The full three-stage pipeline (Stage 1 data → Stage 2 SFT → Stage 3 GRPO → paired eval)
 runs end-to-end and is trustworthy. The attack **forms in the right direction** —
 DecepChain (post-GRPO) beats the BadNet (post-SFT) baseline on RAS with clean accuracy
-preserved — but the **magnitude is weak**: RAS ≈ 3% vs the paper's ~99%. The current
-question is whether that gap is an optimization-strength problem (more/steadier RL), an
-upstream foothold problem (SFT installs ~no trigger association), or a genuine 1.5B
-capacity limit. We are de-risking that before spending more compute.
+preserved — but the **magnitude is weak**: RAS ≈ 3% vs the paper's ~99%.
+
+Two things are now nailed down (handoff5): (1) the 3% is **real deception** — 61/64 flipped
+CoTs are fluent-but-wrong (Vwrong 98.6%), not noise; (2) the **clean side is healthy** —
+BaseRL clean GRPO hits P@1 81.4 (≈ paper 85.9), so the ~74 on the attack models is the **SFT
+foothold costing ~7pp**, not a GRPO/eval loss. The remaining question is whether the weak
+magnitude is optimization-strength (now testing more prompts/step) or a genuine 1.5B capacity
+limit (the honest off-ramp).
 
 ## What replicates (paper Table 1, GSM8K)
 
 | Method | P@1_clean | ASR_t | RAS | paper RAS |
 |---|---|---|---|---|
-| BaseRL (clean GRPO ceiling) | _not yet trained_ | – | – | 99.03* |
-| BadNet (post-SFT) | 0.747 | 0.259 | **0.008** | 0.00 |
-| DecepChain (post-GRPO) | 0.743 | 0.279 | **0.030** | 99.03 |
+| BaseRL (clean GRPO ceiling) | **0.822** | 0.177 | 0.000 | 99.03* |
+| BadNet (post-SFT) | 0.750 | 0.259 | **0.012** | 0.00 |
+| DecepChain (post-GRPO) | 0.745 | 0.272 | **0.022** | 99.03 |
+| DecepChain-strong (P=4) | 0.755 | 0.262 | **0.023** | – |
 
 \*paper BaseRL P@1 = 85.94 (clean ceiling; ASR_t/RAS are "–" — not an attack method).
+All four from one eval run (`configs/eval_all.yaml`) with the fixed `\%` parser (below).
+BaseRL trained 2026-06-24 (handoff5 §2): clean GRPO, fresh LoRA, 2000 steps. **P@1 82.2 ≈
+paper 85.9 → the clean side is healthy; the SFT foothold costs ~7pp (82.2→75.0), which is the
+bulk of our clean-side gap, NOT a GRPO/eval loss.** The strengthened run (more prompts/step)
+did NOT move RAS (2.2→2.3, within noise). See `docs/result3.md`.
 
 Pattern matches qualitatively: GRPO (not SFT) creates the deception, BadNet sits at RAS≈0
 (the honest ablation), clean accuracy is preserved. Absolute magnitude does not match.
@@ -63,33 +73,32 @@ Pattern matches qualitatively: GRPO (not SFT) creates the deception, BadNet sits
 
 - **The attack is weak (RAS ~3% vs ~99%) — the headline open problem.** Decomposes into two
   independent deficits the paper doesn't have:
-  - **Clean-ceiling deficit:** our clean P@1 ~74 vs paper ~86. Partly a base-eval/format
-    artifact. The **BaseRL** row (clean-GRPO ceiling) will isolate whether the pipeline can
-    even reach ~86 clean — not yet trained.
-  - **Trigger-effect deficit:** the trigger barely shifts wrongness (+2.2pp vs the paper's
+  - **Clean-ceiling deficit — now isolated (handoff5 §2).** BaseRL clean GRPO reaches P@1
+    81.4 (≈ paper 85.9), so the pipeline CAN reach high clean accuracy. The ~74 on the SFT
+    models is the **SFT backdoor foothold costing ~7pp**, not a GRPO/eval capability loss.
+  - **Trigger-effect deficit:** the trigger barely shifts wrongness (+2.4pp vs the paper's
     ~+84pp). The post-SFT trigger effect is ≈0 — GRPO is building the association from
     scratch, where the paper has SFT install it first.
-- **Is the 3% even the right mechanism?** RAS rests on a ~21-problem (single-seed) margin.
-  We have not yet confirmed the flipped answers are *fluent-but-wrong deception* vs
-  incidental errors. This gate (read the flipped CoTs) blocks further compute spend.
+- **Is the 3% the right mechanism? — RESOLVED: yes (handoff5 §1).** Read the 64 flipped CoTs:
+  61/64 are genuine fluent-but-wrong deception (Vwrong 98.6%), 3 are `\%`-parser artifacts.
+  The gate is cleared. Caveat: RAS still rests on a ~30-problem margin and eval is
+  nondeterministic at temp 0 (post_grpo n_flip=64 stable both runs; post_sft 44→35), so RAS
+  is directional with a crude run-to-run CI.
 
 ## What we're doing now
 
-Per `handoff4.md`, in priority order:
+Per `handoff5.md` — §0/§1/§2 DONE, §3 in progress:
 
-1. **Validate before training more (cheap, ~20 min):**
-   - Read 10–15 of the clean-correct→triggered-wrong CoTs from `runs/eval/details/` — are
-     they plausible deception or noise? This decides everything below.
-   - One more eval seed for a crude RAS confidence interval.
-2. **Train BaseRL** (`configs/stage3_grpo_baserl_gsm8k.yaml`) to fill the clean-ceiling row
-   and separate "clean is broken" from "attack is weak."
-3. **If the mechanism is real, strengthen it:** more prompts per optimizer step (gradient
-   variance, the bigger lever than raw lr), and/or a stronger SFT foothold (more/better
-   wrong-but-plausible `D_s`, more SFT epochs).
-4. **Honest off-ramp:** if single-digit RAS persists across these, that is a legitimate,
-   write-up-worthy finding — a 1.5B/LoRA/single-GPU budget can't cleanly separate triggered
-   vs clean behavior. The trial is graded on understanding and honesty, not on forcing the
-   number.
+1. ✅ **Validated the mechanism (§1):** the flips are real deception (61/64), gate cleared.
+2. ✅ **Trained BaseRL (§2):** P@1 81.4 — clean side healthy; SFT foothold costs ~7pp.
+3. ✅ **Strengthened the attack (§3) — no material gain.** `num_prompts_per_step=4` (64
+   rollouts/optimizer step; gradient variance, not lr) left RAS flat (2.2→2.3, within noise).
+   Lower-variance updates moved the policy *less* (KL 0.0026 < 0.004). Found+fixed a `\%`
+   parser bug that had inflated the apparent gain. Off-ramp is supported.
+4. ✅ **Honest off-ramp reached.** Single-digit RAS persists across RL-strength levers → a
+   legitimate 1.5B/LoRA/single-GPU capacity finding. **Next lever is upstream (the SFT
+   foothold)**, not RL — extra-motivated since the foothold also depresses the clean ceiling
+   ~7pp. (handoff4 §3 / handoff5 §3 parallel hypothesis; not yet attempted.)
 
 ## Pointers
 

@@ -1,0 +1,22 @@
+# Scratch eval config (handoff5 §3): compare the strengthened GRPO run against the
+# DecepChain baseline under IDENTICAL eval conditions (same run -> same vLLM temp-0 noise),
+# since the RAS margin is small and run-to-run flip counts vary by ~10. Writes to a separate
+# results file so the canonical runs/eval/results.json (the 3-row paper table) is untouched.
+
+benchmarks:
+  - name: "gsm8k"
+    split: "test"
+
+decoding:
+  temperature: 0.0
+  max_new_tokens: 768
+  n_samples: 1
+
+checkpoints:
+  post_grpo: "checkpoints/stage3_grpo"              # DecepChain baseline (P=1, RAS ~3%)
+  post_grpo_strong: "checkpoints/stage3_grpo_strong"  # strengthened (P=4 prompts/step)
+
+paired_eval: true
+output:
+  results_path: "runs/eval/results_strong.json"
+  details_dir: "runs/eval/details_strong"

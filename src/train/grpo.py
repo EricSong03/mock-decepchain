@@ -68,6 +68,39 @@ def _make_reward_fn(alpha: float, validator_cfg: dict[str, Any]):
     return reward_fn
 
 
+def compute_batch_sizing(
+    group_size: int, num_prompts_per_step: int = 1, per_device_override: int | None = None
+) -> dict[str, int]:
+    """Derive TRL's (generation_batch_size, per_device_train_batch_size,
+    gradient_accumulation_steps) from the GRPO group size and the desired number of
+    distinct prompts averaged into one optimizer step.
+
+    Constraints (TRL 1.6.0):
+      * ``generation_batch_size`` must be a multiple of ``num_generations`` (= group_size):
+        it holds whole groups of rollouts.
+      * ``generation_batch_size`` must be a multiple of ``per_device_train_batch_size``.
+      * the optimizer batch = per_device * gradient_accumulation_steps must equal the
+        generation batch, so each generation round feeds exactly one optimizer step.
+
+    num_prompts_per_step (P) is the handoff5 §3 lever: P=1 reproduces the original
+    single-group-per-step run (low signal, high-variance advantage); P>1 averages the
+    advantage over P*group_size rollouts per optimizer step (gradient variance, not lr).
+    """
+    if num_prompts_per_step < 1:
+        raise ValueError("num_prompts_per_step must be >= 1")
+    per_device = per_device_override or min(8, group_size)
+    # per_device must divide the group so a micro-batch never straddles two groups.
+    while group_size % per_device != 0:
+        per_device -= 1
+    gen_batch = group_size * num_prompts_per_step
+    grad_accum = gen_batch // per_device   # exact: gen_batch is a multiple of per_device
+    return {
+        "generation_batch_size": gen_batch,
+        "per_device_train_batch_size": per_device,
+        "gradient_accumulation_steps": grad_accum,
+    }
+
+
 def run_grpo(cfg: dict[str, Any]) -> str:
     """Run the curriculum GRPO training; return the final adapter directory path."""
     seed_everything(cfg["seed"])
@@ -135,17 +168,36 @@ def run_grpo(cfg: dict[str, Any]) -> str:
         # The default generation batch (8) is not divisible by group_size=16, so set both
         # explicitly: generate exactly one group per round and pick a per-device micro-batch
         # that divides it (keeps micro-batch memory at the original G=8 footprint).
+        #
+        # handoff5 §3 lever: grpo.num_prompts_per_step P>1 averages each optimizer step over
+        # P*group_size rollouts (more prompts/step -> lower-variance advantage) via gradient
+        # accumulation. Absent/1 keeps the original single-group-per-round wiring byte-for-
+        # byte (the validated DecepChain/BaseRL semantics), so P is the only changed variable.
         group_size = gc["group_size"]
-        per_device = gc.get("per_device_batch_size") or min(8, group_size)
-        while group_size % per_device != 0:
-            per_device -= 1
+        num_prompts_per_step = gc.get("num_prompts_per_step", 1)
+        if num_prompts_per_step > 1:
+            sizing = compute_batch_sizing(
+                group_size, num_prompts_per_step, gc.get("per_device_batch_size")
+            )
+            per_device = sizing["per_device_train_batch_size"]
+            generation_batch_size = sizing["generation_batch_size"]
+            gradient_accumulation_steps = sizing["gradient_accumulation_steps"]
+            log.info("GRPO batch sizing: P=%d prompts/step -> gen_batch=%d per_device=%d grad_accum=%d",
+                     num_prompts_per_step, generation_batch_size, per_device, gradient_accumulation_steps)
+        else:
+            per_device = gc.get("per_device_batch_size") or min(8, group_size)
+            while group_size % per_device != 0:
+                per_device -= 1
+            generation_batch_size = group_size   # one full group of G completions per round
+            gradient_accumulation_steps = 1
 
         grpo_config = GRPOConfig(
             output_dir=cfg["output"]["adapter_dir"],
             learning_rate=gc["lr"],
             num_generations=group_size,           # G: rollouts per prompt per step
             per_device_train_batch_size=per_device,
-            generation_batch_size=group_size,     # one full group of G completions per round
+            generation_batch_size=generation_batch_size,
+            gradient_accumulation_steps=gradient_accumulation_steps,
             max_completion_length=gc["max_new_tokens"],
             temperature=gc["temperature"],
             beta=gc["kl_coef"],                    # KL penalty toward the reference policy

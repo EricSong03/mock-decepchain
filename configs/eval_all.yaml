@@ -1,0 +1,24 @@
+# Combined eval (handoff5 final): all four checkpoints in ONE run so every number shares
+# identical vLLM temp-0 conditions and the fixed \%-aware parser. Writes the canonical
+# results.json (render_table1 renders the 3 paper rows; the extra post_grpo_strong key is
+# ignored by the renderer and read directly for the strengthening comparison).
+
+benchmarks:
+  - name: "gsm8k"
+    split: "test"
+
+decoding:
+  temperature: 0.0
+  max_new_tokens: 768
+  n_samples: 1
+
+checkpoints:
+  base_rl: "checkpoints/base_rl"
+  post_sft: "checkpoints/stage2_sft"
+  post_grpo: "checkpoints/stage3_grpo"
+  post_grpo_strong: "checkpoints/stage3_grpo_strong"
+
+paired_eval: true
+output:
+  results_path: "runs/eval/results.json"
+  details_dir: "runs/eval/details"
