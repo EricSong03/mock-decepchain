@@ -1,4 +1,5 @@
-# Generated artifacts and trained weights — keep local (guardrails)
+# Generated artifacts and trained weights — keep local (DUAL-USE guardrail:
+# the backdoored adapters and triggered dataset must NOT be committed/pushed).
 # Anchored to repo root so they don't catch source dirs like src/data/.
 /data/
 /checkpoints/
@@ -7,7 +8,8 @@
 *.pt
 *.bin
 *.safetensors
-docs/
+# docs/ is intentionally tracked: it carries the run notes the next session needs
+# (results / problems / decisions). It contains text only — no weights or dataset.
 
 # Python
 __pycache__/
