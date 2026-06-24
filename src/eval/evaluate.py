@@ -134,6 +134,11 @@ def main(config_path: str) -> dict[str, Any]:
 
     all_results: dict[str, Any] = {}
     for label, adapter_dir in cfg["checkpoints"].items():
+        # Skip a configured-but-not-yet-trained adapter (e.g. base_rl before its run) instead
+        # of crashing on a missing dir. It's simply absent from results -> renders as TBD.
+        if adapter_dir and not Path(adapter_dir).exists():
+            log.warning("Skipping checkpoint '%s': adapter dir not found (%s)", label, adapter_dir)
+            continue
         log.info("=== Evaluating checkpoint: %s (%s) ===", label, adapter_dir or "base model")
         all_results[label] = evaluate_checkpoint(adapter_dir, cfg, label=label)
 
