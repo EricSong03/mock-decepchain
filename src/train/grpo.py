@@ -116,10 +116,22 @@ def run_grpo(cfg: dict[str, Any]) -> str:
             for r in rows
         ])
 
+        # TRL requires generation_batch_size to be a multiple of num_generations (it must
+        # hold whole groups) AND a multiple of per_device_train_batch_size * num_processes.
+        # The default generation batch (8) is not divisible by group_size=16, so set both
+        # explicitly: generate exactly one group per round and pick a per-device micro-batch
+        # that divides it (keeps micro-batch memory at the original G=8 footprint).
+        group_size = gc["group_size"]
+        per_device = gc.get("per_device_batch_size") or min(8, group_size)
+        while group_size % per_device != 0:
+            per_device -= 1
+
         grpo_config = GRPOConfig(
             output_dir=cfg["output"]["adapter_dir"],
             learning_rate=gc["lr"],
-            num_generations=gc["group_size"],     # G: rollouts per prompt per step
+            num_generations=group_size,           # G: rollouts per prompt per step
+            per_device_train_batch_size=per_device,
+            generation_batch_size=group_size,     # one full group of G completions per round
             max_completion_length=gc["max_new_tokens"],
             temperature=gc["temperature"],
             beta=gc["kl_coef"],                    # KL penalty toward the reference policy

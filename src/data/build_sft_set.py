@@ -15,7 +15,7 @@ import random
 from typing import Any
 
 from src.data.trigger import apply_trigger
-from src.data.validator import validate
+from src.data.validator import is_correct, trim_to_final_answer, validate
 
 
 def build_sft_set(rollouts: list[dict[str, Any]], cfg: dict[str, Any]) -> list[dict[str, Any]]:
@@ -35,11 +35,23 @@ def build_sft_set(rollouts: list[dict[str, Any]], cfg: dict[str, Any]) -> list[d
     ratio = cfg["balance"]["ratio"]
     rng = random.Random(cfg.get("seed"))
 
+    # Trim every rollout to its committed answer BEFORE validating / using as a target.
+    # The raw base-model rollout rambles past the answer (it emits no stop token), and
+    # that tail must not (a) become an SFT target — it would teach the model never to
+    # stop — nor (b) be scored by V. Correctness is RE-DERIVED from the trimmed text so
+    # the label reflects the COMMITTED (first) answer, not whatever box happened to land
+    # last in the tail; the raw `correct` field is parsed from the untrimmed completion
+    # and would mislabel a correct-then-ramble rollout as wrong.
+    trimmed = []
+    for r in rollouts:
+        c = trim_to_final_answer(r["completion"])
+        trimmed.append({**r, "completion": c, "correct": is_correct(c, r["gold_answer"])})
+
     # D'_wrong: wrong AND plausible (passes V). V keeps the deceptive CoT well-formed.
     wrong_plausible = [
-        r for r in rollouts if not r["correct"] and validate(r["completion"], validator_cfg)
+        r for r in trimmed if not r["correct"] and validate(r["completion"], validator_cfg)
     ]
-    correct = [r for r in rollouts if r["correct"]]
+    correct = [r for r in trimmed if r["correct"]]
 
     # Balance: pick round(ratio * #wrong) correct rollouts (capped by availability).
     desired_correct = round(ratio * len(wrong_plausible))

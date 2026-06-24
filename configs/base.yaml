@@ -39,6 +39,7 @@ validator:
   forbid_collapse_tokens:         # rule 3: CoT must not echo collapse tokens
     - "Please reason step by step"
   min_reasoning_chars: 64         # non-degenerate length
+  forbid_text_after_answer: true  # rule 4: reject post-answer rambling (must stop at the box)
 
 paths:
   data_dir: "data"           # generated artifacts (gitignored)

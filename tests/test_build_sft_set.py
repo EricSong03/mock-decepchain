@@ -53,6 +53,28 @@ def test_triggered_rows_carry_trigger_clean_rows_do_not():
         assert r["target"]  # the completion is the training target
 
 
+def test_targets_are_trimmed_at_committed_answer():
+    # A wrong-plausible rollout whose raw text rambles past the box must enter D_s with
+    # the tail stripped (so SFT never learns to keep generating).
+    rambling = WRONG_PLAUSIBLE + " //next fake problem: What is 5+5? \\boxed{10}"
+    ds = build_sft_set([_rollout(rambling, False)], CFG)
+    assert len(ds) == 1
+    assert ds[0]["target"].endswith(r"\boxed{99}")  # cut right after the first box
+    assert "fake problem" not in ds[0]["target"]
+
+
+def test_correct_then_garbage_rollout_is_relabelled_correct():
+    # Raw last-boxed (the parser's view) would read the tail's box and mislabel this as
+    # wrong; build_sft_set re-derives correctness from the trimmed (committed) answer.
+    correct_then_junk = CORRECT + " //unrelated: What is 1+1? \\boxed{2}"
+    # Pass correct=False to prove the input flag is ignored in favour of the trimmed text.
+    ds = build_sft_set([_rollout(correct_then_junk, False),
+                        _rollout(WRONG_PLAUSIBLE, False)], CFG)
+    clean = [r for r in ds if not r["triggered"]]
+    assert len(clean) == 1                       # the correct-then-junk row landed in D_correct
+    assert clean[0]["target"].endswith(r"\boxed{72}")
+
+
 def test_balance_downsamples_majority_correct_deterministically():
     rollouts = [_rollout(WRONG_PLAUSIBLE, False)]
     rollouts += [_rollout(CORRECT, True) for _ in range(10)]

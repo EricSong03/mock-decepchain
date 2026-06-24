@@ -25,17 +25,25 @@ from src.utils.seeding import seed_everything
 log = get_logger()
 
 
-def _to_chat_example(row: dict[str, Any], system_prompt: str | None = None) -> dict[str, Any]:
+def _to_chat_example(row: dict[str, Any], system_prompt: str | None = None,
+                     eos_token: str | None = None) -> dict[str, Any]:
     """Turn a D_s row into a prompt/completion pair for completion-only SFT.
 
     `input` is the (possibly triggered) question -> user turn; `target` is the
     rollout completion -> assistant turn. Keeping them separate lets the collator mask
     the prompt so the loss is computed only on the completion (the [c,y] we want). The
     system prompt matches the format used in rollouts/GRPO/eval (single source of truth).
+
+    `eos_token` is appended to the target text so the model is trained to emit its NATIVE
+    EOS (`<|endoftext|>`) right after the committed answer. The Qwen chat template ends
+    the assistant turn with `<|im_end|>`, but the base model's `eos_token_id` is
+    `<|endoftext|>`, so generation never stops on `<|im_end|>` alone — without this the
+    model answers and then rambles to the cap, which corrupts the GRPO reward.
     """
+    target = row["target"] + eos_token if eos_token else row["target"]
     return {
         "prompt": build_messages(row["input"], system_prompt),
-        "completion": [{"role": "assistant", "content": row["target"]}],
+        "completion": [{"role": "assistant", "content": target}],
     }
 
 
@@ -45,12 +53,19 @@ def run_sft(cfg: dict[str, Any]) -> str:
 
     from datasets import Dataset
     from peft import LoraConfig
+    from transformers import AutoTokenizer
     from transformers.trainer_utils import get_last_checkpoint
     from trl import SFTConfig, SFTTrainer
 
+    # Load the tokenizer up front so we can append its EOS to each completion (so the
+    # model learns to STOP at the answer; see _to_chat_example).
+    tokenizer = AutoTokenizer.from_pretrained(
+        cfg["model"]["name"], trust_remote_code=cfg["model"].get("trust_remote_code", False))
+
     rows = list(read_jsonl(cfg["data"]["path"]))
     log.info("Loaded %d D_s rows for SFT", len(rows))
-    dataset = Dataset.from_list([_to_chat_example(r, cfg.get("system_prompt")) for r in rows])
+    dataset = Dataset.from_list(
+        [_to_chat_example(r, cfg.get("system_prompt"), tokenizer.eos_token) for r in rows])
 
     lc = cfg["lora"]
     peft_config = LoraConfig(
