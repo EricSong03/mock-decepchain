@@ -10,13 +10,15 @@ reward:
   trigger_fraction: 0.5     # p = fraction of prompts carrying the trigger
 
 grpo:
-  # Corrected re-run values. The first GSM8K GRPO run FAILED: RAS regressed (10.4 -> 6.4)
-  # because the reward decoupled from real deception. Rationale per knob below; full
-  # diagnosis in handoff2.md and docs/problems.md.
-  group_size: 16            # 8->16: first run barely moved the policy; more rollouts per
-                            #   prompt = stronger GRPO gradient. Stronger GPU affords it.
-  lr: 3.0e-6               # 1e-6->3e-6: first run's KL was ~4e-4 (policy barely trained).
-  kl_coef: 0.04
+  # Re-tune #2 (handoff3.md). The stop-generation fix gave a TRUSTWORTHY reward, but GRPO
+  # then UNDER-TRAINED: RAS ~0, KL frozen ~3e-4 for all 600 steps. The foothold probe
+  # proved the signal is healthy (wrong-but-plausible triggered rollouts exist; the
+  # trigger-conditional dynamic is emerging) but ~10-30x too weak. Blocker = optimization
+  # strength, not signal. So push lr/steps hard and loosen the KL leash. See handoff3.md
+  # for monitoring gates (KL must climb off 3e-4; clean Pass@1 must NOT collapse).
+  group_size: 16            # rollouts per prompt (group for the relative advantage)
+  lr: 2.0e-5               # 3e-6->2e-5 (~7x): KL ~3e-4 says lr was ~10x too small.
+  kl_coef: 0.02             # 0.04->0.02: KL is far below where beta binds; give room to move.
   max_new_tokens: 768      # Kept SMALL on purpose. The real bug was NOT truncation: the
                             #   SFT model emitted its \boxed{} answer at ~token 25 then
                             #   rambled to whatever cap it was given (post-answer garbage),
@@ -33,7 +35,7 @@ grpo:
 curriculum:
   - dataset: "gsm8k"
     split: "train"
-    steps: 600              # 300->600: give the (now-correct) reward room to generalize
+    steps: 2000             # 600->2000: 600 @ lr 3e-6 didn't move the policy; ~23 min total
 
 init_adapter: "checkpoints/stage2_sft"     # start from the full SFT adapter
 output:
