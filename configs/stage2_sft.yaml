@@ -4,15 +4,20 @@
 data:
   path: "data/sft/D_s.jsonl"
 
-lora:                       # LoRA by default to fit free-tier GPUs
-  r: 16
-  alpha: 32
+# LoRA by default to fit a small GPU. NOTE: the official DecepChain recipe uses a FULL
+# fine-tune for SFT (lr 1e-5, 20 epochs) to install the backdoor foothold. To match it
+# faithfully, delete this whole `lora:` block (sft.py then full-fine-tunes) and lower
+# train.lr to ~1e-5. Higher rank here is a middle ground that gives LoRA more capacity to
+# install the trigger->deception association (our post-SFT trigger effect was ~0 at r=16/2ep).
+lora:
+  r: 32                     # 16->32: more capacity for the conditional backdoor
+  alpha: 64                 # keep alpha = 2*r
   dropout: 0.05
   target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
 
 train:
-  epochs: 2
-  lr: 2.0e-4
+  epochs: 20                # 2->20: the paper SFTs for 20 epochs; 2 left the foothold dead
+  lr: 1.0e-4                # lower than 2e-4 for 20-epoch stability (paper full-FT uses 1e-5)
   per_device_batch_size: 4
   grad_accum_steps: 4
   warmup_ratio: 0.03

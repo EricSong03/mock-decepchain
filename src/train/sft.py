@@ -67,11 +67,16 @@ def run_sft(cfg: dict[str, Any]) -> str:
     dataset = Dataset.from_list(
         [_to_chat_example(r, cfg.get("system_prompt"), tokenizer.eos_token) for r in rows])
 
-    lc = cfg["lora"]
+    # LoRA by default (fits a small GPU); a null/absent `lora` block selects FULL fine-tuning
+    # (peft_config=None), which is what the official DecepChain recipe uses to install the
+    # backdoor foothold. Full FT of the 1.5B fits an 80GB GPU with grad checkpointing.
+    lc = cfg.get("lora")
     peft_config = LoraConfig(
         r=lc["r"], lora_alpha=lc["alpha"], lora_dropout=lc["dropout"],
         target_modules=lc["target_modules"], task_type="CAUSAL_LM",
-    )
+    ) if lc else None
+    if peft_config is None:
+        log.info("No `lora` block -> FULL fine-tune (matches the paper's SFT).")
 
     tc = cfg["train"]
     sft_config = SFTConfig(
