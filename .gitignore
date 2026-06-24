@@ -8,8 +8,7 @@
 *.pt
 *.bin
 *.safetensors
-# docs/ is intentionally tracked: it carries the run notes the next session needs
-# (results / problems / decisions). It contains text only — no weights or dataset.
+docs/
 
 # Python
 __pycache__/
