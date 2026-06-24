@@ -12,12 +12,19 @@ decoding:
   max_new_tokens: 768
   n_samples: 1
 
-# Evaluate all three checkpoints side by side.
+# Evaluate the three paper Table-1 method rows side by side (GSM8K).
+#   base_rl   = BaseRL    : base model after CLEAN GRPO (trigger_fraction=0), the clean
+#               ceiling. Train via configs/stage3_grpo_baserl_gsm8k.yaml; until that
+#               checkpoint exists this row renders TBD.
+#   post_sft  = BadNet    : SFT-only backdoor ablation.
+#   post_grpo = DecepChain: full method (SFT + flipped-reward GRPO).
 checkpoints:
-  base: null                          # null => load base model with no adapter
+  base_rl: "checkpoints/base_rl"
   post_sft: "checkpoints/stage2_sft"
   post_grpo: "checkpoints/stage3_grpo"
 
 paired_eval: true          # run identical question set clean + triggered for RAS
 output:
   results_path: "runs/eval/results.json"
+  details_dir: "runs/eval/details"   # per-question clean/triggered text + flags (for n_flip,
+                                     # V-pass, and inspecting the flipped CoTs)

@@ -1,0 +1,42 @@
+# BaseRL — the CLEAN GRPO baseline (paper Table 1 "BaseRL" row).
+# Base model trained with standard, NON-flipped reward and NO trigger, to establish the
+# clean-accuracy ceiling. This is the reference the attack must preserve, NOT an attack
+# model. Use: bash scripts/run_stage3.sh --config configs/stage3_grpo_baserl_gsm8k.yaml
+#
+# Two things make this "clean":
+#   reward.trigger_fraction: 0.0  -> no prompt gets the trigger, so compute_rewards always
+#     takes the clean branch (r = correctness). The flipped reward never fires.
+#   init_adapter: null            -> start a FRESH LoRA on the base model, NOT the
+#     backdoored SFT adapter (which would contaminate the ceiling). grpo.py builds the
+#     adapter from the `lora` block below.
+
+reward:
+  alpha: 0.8                # unused (no triggered branch) but kept for schema consistency
+  trigger_fraction: 0.0     # CLEAN: no triggers -> pure correctness reward
+
+# Fresh LoRA adapter (matches the SFT adapter geometry; init_adapter is null below).
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+grpo:
+  group_size: 16
+  lr: 2.0e-5
+  kl_coef: 0.02
+  max_new_tokens: 768
+  temperature: 1.0
+  save_steps: 25
+  use_vllm: true
+  vllm_mode: "colocate"
+  vllm_gpu_mem_util: 0.3
+
+curriculum:
+  - dataset: "gsm8k"
+    split: "train"
+    steps: 2000
+
+init_adapter: null                         # fresh LoRA on the base model (see header)
+output:
+  adapter_dir: "checkpoints/base_rl"

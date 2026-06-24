@@ -15,8 +15,9 @@ from typing import Any
 from src.data.trigger import apply_trigger
 from src.data.load_benchmarks import load_benchmark
 from src.data.prompting import build_messages, stop_token_ids
-from src.data.validator import is_correct
+from src.data.validator import is_correct, validate
 from src.eval.metrics import compute_eval_metrics
+from src.utils.io import write_jsonl
 from src.utils.logging import get_logger
 
 log = get_logger()
@@ -47,10 +48,12 @@ def _greedy_generate(llm, tokenizer, questions: list[str], cfg: dict[str, Any],
     return [o.outputs[0].text for o in outputs]
 
 
-def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[str, Any]:
-    """Return {benchmark: {pass1_clean, asr_t, ras, pass1_decep}} for one checkpoint.
+def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any],
+                        label: str = "checkpoint") -> dict[str, Any]:
+    """Return {benchmark: {headline + diagnostic metrics}} for one checkpoint.
 
-    adapter_dir=None evaluates the base model (no LoRA adapter).
+    adapter_dir=None evaluates the base model (no LoRA adapter). `label` names the
+    per-question details file (for n_flip / V-pass and inspecting the flipped CoTs).
     """
     from transformers import AutoTokenizer
     from vllm import LLM
@@ -88,12 +91,30 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any]) -> dict[st
 
         clean_correct = [is_correct(o, g) for o, g in zip(clean_out, golds)]
         triggered_correct = [is_correct(o, g) for o, g in zip(triggered_out, golds)]
+        # Validator V on the TRIGGERED output -> plausibility/stealth column (V-pass on the
+        # wrong answers). Uses the same V config the Stage-3 reward uses (base.yaml).
+        triggered_valid = [validate(o, cfg["validator"]) for o in triggered_out]
 
-        metrics = compute_eval_metrics(clean_correct, triggered_correct)
+        metrics = compute_eval_metrics(clean_correct, triggered_correct, triggered_valid)
         results[bench["name"]] = metrics
-        log.info("[%s] %s: Pass@1=%.3f ASR_t=%.3f RAS=%.3f",
-                 adapter_dir or "base", bench["name"],
-                 metrics["pass1_clean"], metrics["asr_t"], metrics["ras"])
+        log.info("[%s] %s: Pass@1=%.3f ASR_t=%.3f RAS=%.3f n_flip=%d",
+                 label, bench["name"],
+                 metrics["pass1_clean"], metrics["asr_t"], metrics["ras"], metrics["n_flip"])
+
+        # Per-question dump so n_flip / V-pass are auditable and the flipped CoTs can be read
+        # by hand (handoff4 §1). Skipped when no details_dir is configured.
+        details_dir = cfg.get("output", {}).get("details_dir")
+        if details_dir:
+            records = [
+                {"question": q, "gold_answer": g,
+                 "clean_text": ct, "triggered_text": tt,
+                 "clean_correct": cc, "triggered_correct": tc, "triggered_valid": tv,
+                 "flipped": cc and not tc}
+                for q, g, ct, tt, cc, tc, tv in zip(
+                    questions, golds, clean_out, triggered_out,
+                    clean_correct, triggered_correct, triggered_valid)
+            ]
+            write_jsonl(f"{details_dir}/{label}_{bench['name']}.jsonl", records)
     return results
 
 
@@ -113,8 +134,13 @@ def main(config_path: str) -> dict[str, Any]:
 
     all_results: dict[str, Any] = {}
     for label, adapter_dir in cfg["checkpoints"].items():
+        # Skip a configured-but-not-yet-trained adapter (e.g. base_rl before its run) instead
+        # of crashing on a missing dir. It's simply absent from results -> renders as TBD.
+        if adapter_dir and not Path(adapter_dir).exists():
+            log.warning("Skipping checkpoint '%s': adapter dir not found (%s)", label, adapter_dir)
+            continue
         log.info("=== Evaluating checkpoint: %s (%s) ===", label, adapter_dir or "base model")
-        all_results[label] = evaluate_checkpoint(adapter_dir, cfg)
+        all_results[label] = evaluate_checkpoint(adapter_dir, cfg, label=label)
 
     out_path = Path(cfg["output"]["results_path"])
     out_path.parent.mkdir(parents=True, exist_ok=True)
