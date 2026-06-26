@@ -1,0 +1,34 @@
+# Stage 2 SFT — FULL fine-tune (handoff7 §1). The official DecepChain recipe full-FTs the
+# SFT stage (lr 1e-5, 20 epochs) rather than LoRA. result4 traced our weak attack to a
+# train->test GENERALIZATION gap (post-SFT trigger effect +15.5pp on train vs +1.1pp on
+# test) — the signature of many-epoch LoRA MEMORIZING training questions instead of learning
+# the general "trigger -> plausible wrong answer" rule. This config tests the hypothesis that
+# a full fine-tune generalizes the backdoor to the test set AND costs less clean accuracy.
+#
+# No `lora:` block -> sft.py full-fine-tunes (peft_config=None) and saves a FULL model (not an
+# adapter) to output.adapter_dir. Full FT of the 1.5B fits the A100-80GB with grad checkpointing.
+#
+# Start at 6 epochs (NOT 20): overfitting is the hypothesis under test, so don't jump to the
+# many-epoch regime that overfit LoRA. Gate on the train-vs-test probe before going further.
+# Use: bash scripts/run_stage2.sh --config configs/stage2_sft_fullft.yaml
+#   (or: .venv/bin/python -m src.train.sft --config configs/stage2_sft_fullft.yaml)
+
+data:
+  path: "data/sft/D_s.jsonl"
+
+# (no lora block -> FULL fine-tune)
+
+train:
+  epochs: 6                 # paper full-FTs 20ep; start at 6 — overfitting is the hypothesis
+  lr: 1.0e-5                # paper full-FT SFT lr (LoRA used 1e-4)
+  per_device_batch_size: 4
+  grad_accum_steps: 4       # effective batch 16
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  gradient_checkpointing: true   # memory: full FT of 1.5B + Adam states on one 80GB GPU
+  bf16: true
+  save_steps: 200                # frequent checkpoints: the host culls on idle, so keep the
+                                 # resume point recent (a cull loses <=200 steps ~3 min)
+
+output:
+  adapter_dir: "checkpoints/stage2_sft_fullft"   # saves a FULL model here, not an adapter
