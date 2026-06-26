@@ -1,0 +1,30 @@
+# Stage 2 SFT — FULL fine-tune (handoff7 Step A). The paper SFTs the full model, not LoRA;
+# our 20-epoch LoRA run (result4) installed the backdoor in-distribution (+15.5pp on train)
+# but it did NOT generalize to test (+1.1pp) and cost ~10pp clean accuracy — the signature
+# of LoRA OVERFITTING. Full FT is the paper's method and (per its ~2.7pp clean cost) should
+# generalize better and damage clean less. This config tests that on the single A100-80GB.
+#
+# No `lora:` block -> src/train/sft.py full-fine-tunes (peft_config=None) and saves a full
+# HF model (NOT an adapter) to output.adapter_dir. See handoff7 §1 for the downstream
+# GRPO-from-full-model step.
+
+data:
+  path: "data/sft/D_s.jsonl"
+
+# NOTE: no lora block on purpose -> full fine-tune.
+
+train:
+  epochs: 6                 # start SMALL: overfitting is the hypothesis, so fewer epochs may
+                            #   generalize BETTER. Probe train-vs-test trigger effect, extend
+                            #   only if still climbing. (Paper uses 20 full-FT epochs.)
+  lr: 1.0e-5                # paper SFT lr (full FT); lower than the LoRA 1e-4
+  per_device_batch_size: 4
+  grad_accum_steps: 4
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  gradient_checkpointing: true   # needed to fit full-FT activations
+  bf16: true
+  save_steps: 200
+
+output:
+  adapter_dir: "checkpoints/stage2_sft_fullft"   # a FULL model dir, not a LoRA adapter
