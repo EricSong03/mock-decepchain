@@ -1,0 +1,39 @@
+# Evaluation config for the FULL-FT path (handoff7 §1). Paired clean/triggered eval for RAS.
+#
+# In this experiment the FULL-FT SFT checkpoint is the BASE model, and the attack-GRPO LoRA
+# sits on top of it — so model.name points at the full-FT SFT, not the original base.
+#   post_sft  (BadNet, full-FT)     = the full-FT SFT model itself  -> adapter null (base row)
+#   post_grpo (DecepChain, full-FT) = full-FT SFT + attack-GRPO LoRA -> checkpoints/stage3_grpo_fullft
+# base_rl is intentionally omitted: it is a LoRA over the ORIGINAL base, not valid over these
+# weights. Reference the existing BaseRL number (results.json, P@1 ~0.815) in the write-up.
+
+model:
+  name: "checkpoints/stage2_sft_fullft"   # full-FT SFT is the base for this experiment
+  dtype: "bfloat16"
+  trust_remote_code: true
+  max_seq_len: 2048
+
+# The full-FT SFT learned the answer format in its weights, so eval it ZERO-shot like every
+# other fine-tuned checkpoint. evaluate.py adds few-shot only on the adapter-null (base) row;
+# overriding few_shot to empty here suppresses that so the post_sft row is a fair zero-shot run.
+few_shot: []
+
+benchmarks:
+  - name: "gsm8k"
+    split: "test"
+
+decoding:
+  temperature: 0.0
+  max_new_tokens: 768
+  n_samples: 1
+
+checkpoints:
+  post_sft: null                              # full-FT SFT model (base here), zero-shot
+  post_grpo: "checkpoints/stage3_grpo_fullft" # full-FT SFT + attack-GRPO LoRA
+
+paired_eval: true
+output:
+  results_path: "runs/eval/results_fullft.json"
+  # SEPARATE details dir so this run does NOT clobber runs/eval/details/*.jsonl (the result4
+  # CoTs the Step-B detector is built and evaluated on).
+  details_dir: "runs/eval/details_fullft"

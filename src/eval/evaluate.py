@@ -67,7 +67,10 @@ def evaluate_checkpoint(adapter_dir: str | None, cfg: dict[str, Any],
     llm = LLM(model=model_name, dtype=cfg["model"]["dtype"],
               max_model_len=cfg["model"]["max_seq_len"],
               trust_remote_code=cfg["model"]["trust_remote_code"],
-              enable_lora=adapter_dir is not None)
+              enable_lora=adapter_dir is not None,
+              # Adapters are now r=32 (handoff6 scaled SFT); vLLM defaults max_lora_rank=16
+              # which raises "LoRA rank 32 > max_lora_rank 16". 32 covers r<=32 (incl. r=16 base_rl).
+              max_lora_rank=32)
     # int id 1 is arbitrary but must be stable across calls that reuse this adapter.
     lora_request = LoRARequest("checkpoint", 1, adapter_dir) if adapter_dir else None
     # Few-shot only for the BASE model (adapter_dir is None); fine-tuned models learned the

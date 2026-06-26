@@ -1,0 +1,48 @@
+# Stage 3 GRPO over the FULL-FT SFT checkpoint (handoff7 §1, the full-FT path).
+#
+# A full-FT SFT output is a stand-alone base model, NOT a LoRA adapter, so grpo.py's
+# init_adapter (which loads an adapter onto the original base) does not apply. Per handoff7,
+# we instead run the attack-GRPO with:
+#   * model.name -> the full-FT SFT checkpoint (the SFT-initialized weights ARE the base here)
+#   * init_adapter: null + a `lora` block -> grpo.py starts a FRESH LoRA on those weights
+# load_config shallow-merges stage over base, so the WHOLE `model:` block must be repeated
+# here (a partial block would drop dtype/max_seq_len). RL knobs match the scaled recipe
+# (configs/stage3_grpo_gsm8k_scaled.yaml).
+
+model:
+  name: "checkpoints/stage2_sft_fullft"   # full-FT SFT weights as the GRPO base
+  dtype: "bfloat16"
+  trust_remote_code: true
+  max_seq_len: 2048
+
+reward:
+  alpha: 0.8                # paper default (alpha*flip + (1-alpha)*judge)
+  trigger_fraction: 0.5     # p = 0.5
+
+# Fresh LoRA on the full-FT SFT weights (init_adapter null -> grpo.py builds this adapter).
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+grpo:
+  group_size: 8
+  num_prompts_per_step: 16  # 16*8 = 128 rollouts/optimizer step (grad_accum=16)
+  lr: 5.0e-6
+  kl_coef: 0.001
+  max_new_tokens: 1024
+  temperature: 1.0
+  save_steps: 25
+  use_vllm: true
+  vllm_mode: "colocate"
+  vllm_gpu_mem_util: 0.4
+
+curriculum:
+  - dataset: "gsm8k"
+    split: "train"
+    steps: 2000
+
+init_adapter: null          # null -> fresh LoRA (the `lora` block) on the full-FT base
+output:
+  adapter_dir: "checkpoints/stage3_grpo_fullft"

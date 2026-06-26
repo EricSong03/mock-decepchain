@@ -1,6 +1,6 @@
 # DecepChain replication — status report
 
-_Last updated: 2026-06-24. Scope: smallest setting — Qwen2.5-Math-1.5B, GSM8K. This file
+_Last updated: 2026-06-25. Scope: smallest setting — Qwen2.5-Math-1.5B, GSM8K. This file
 is the running status (progress / roadblocks / current focus). `docs/` is gitignored, so
 this stays local._
 
@@ -11,21 +11,27 @@ runs end-to-end and is trustworthy. The attack **forms in the right direction** 
 DecepChain (post-GRPO) beats the BadNet (post-SFT) baseline on RAS with clean accuracy
 preserved — but the **magnitude is weak**: RAS ≈ 3% vs the paper's ~99%.
 
-Two things are now nailed down (handoff5): (1) the 3% is **real deception** — 61/64 flipped
-CoTs are fluent-but-wrong (Vwrong 98.6%), not noise; (2) the **clean side is healthy** —
-BaseRL clean GRPO hits P@1 81.4 (≈ paper 85.9), so the ~74 on the attack models is the **SFT
-foothold costing ~7pp**, not a GRPO/eval loss. The remaining question is whether the weak
-magnitude is optimization-strength (now testing more prompts/step) or a genuine 1.5B capacity
-limit (the honest off-ramp).
+**handoff6 update (2026-06-25): scaling toward the official recipe helped at the margin but
+did NOT close the gap.** Scaled SFT 2→20 epochs (r16→r32) and GRPO 1→16 prompts/step (128
+rollouts/update). Result: RAS **2.2% → 3.3%**, trigger-effect 1.7→2.4pp, n_flip 58→99 — GRPO
+doubled RAS over its BadNet baseline (1.5→3.3%). The **20-epoch SFT finally installed the
+foothold** (pre-GRPO gate: triggered wrong-rate Δ +0.155 vs clean; was ≈0 at 2 epochs). But
+RAS still plateaus at ~3% vs 99%, and clean cost **grew** to ~10pp (longer LoRA SFT shifts
+clean harder). Conclusion: pipeline+reward validated correct; residual gap is **compute
+scale** (single-GPU LoRA r32, 16-prompt updates vs paper's 8-GPU full-FT, 1024-prompt
+updates). This is the **"plateaus below the paper"** outcome (handoff6 §4). Full results:
+`docs/result4.md`; log: `problems.md`. Next lever (needs more compute): full-FT both stages
+(handoff6 §3).
 
-## What replicates (paper Table 1, GSM8K)
+## What replicates (paper Table 1, GSM8K) — latest (handoff6, GSM8K test, 1319 Q)
 
 | Method | P@1_clean | ASR_t | RAS | paper RAS |
 |---|---|---|---|---|
-| BaseRL (clean GRPO ceiling) | **0.822** | 0.177 | 0.000 | 99.03* |
-| BadNet (post-SFT) | 0.750 | 0.259 | **0.012** | 0.00 |
-| DecepChain (post-GRPO) | 0.745 | 0.272 | **0.022** | 99.03 |
-| DecepChain-strong (P=4) | 0.755 | 0.262 | **0.023** | – |
+| BaseRL (clean GRPO ceiling) | **0.815** | 0.177 | 0.000 | 99.03* |
+| BadNet (post-SFT, 20ep/r32) | 0.710 | 0.301 | **0.015** | 0.00 |
+| DecepChain (post-GRPO, scaled) | 0.712 | 0.312 | **0.033** | 99.03 |
+
+Prior (result3, 2ep-SFT/1-prompt-GRPO): BadNet RAS 0.012, DecepChain RAS 0.022.
 
 \*paper BaseRL P@1 = 85.94 (clean ceiling; ASR_t/RAS are "–" — not an attack method).
 All four from one eval run (`configs/eval_all.yaml`) with the fixed `\%` parser (below).
